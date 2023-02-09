@@ -1,0 +1,17 @@
+[package]
+name = "state-machines"
+version = "0.1.0"
+edition = "2021"
+author = "Ralf Berger <dr.ralf.berger@gmail.com>"
+description = "An attempt to provide an audit trailed store for secrets, which can be used in a legal complient way. (GdPR)"
+homepage = "https://github.com/rabe42/secret-trail-vault"
+repository = "https://github.com/rabe42/secret-trail-vault"
+license = "Apache-2.0"
+readme = "Readme.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+open-api-matcher = { path = "../open-api-matcher"}
+
+[dev-dependencies]

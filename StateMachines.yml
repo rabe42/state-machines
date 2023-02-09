@@ -1,0 +1,535 @@
+openapi: "3.0.3"
+info:
+  title: State Machines Micro-Service
+  description: 
+    This is the web interface of a state machine micro service. It allows the
+    creation of new state charts. The start of a state chart, which creates a
+    state machine. And sending queries to this state machine about its current
+    state.
+
+    State charts are considered as a hierarchy of state-nodes, associated with
+    attributes (a.k.a. variables) and guarded transitions. 
+
+    The Ids of state-chart nodes, variables and state-machine-states are defined
+    URI pathes, which reflects exactly the hierarchy of the state-nodes.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: "0.1"
+# servers:
+#   - https://state-machine.org/
+
+paths:
+  /state-chart:
+    get:
+      summary: Get the list of all state chart Ids managed by this service.
+      responses:
+        '200':
+          description:
+            An array with all state-charts managed by this service.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+    post:
+      summary: Creates a new state-chart with the JSON description in the body
+        of this request.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description:
+            The state-chart was successfully created.
+            The id in the provided node is the id, by which a
+            state-machine can be created.
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400':
+          description:
+            The state-chart wasn't created. An indication about the problem
+            will be provided in the text.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /state-chart/{id}:
+    get:
+      summary: Get the details of an paritcular state-chart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description:
+            Delivers the requested state-chart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '404':
+          description:
+            The requested state-chart couldn't be found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Updates the state-chart with the JSON description in the request
+        body.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description:
+            The state-chart was successfully created.
+            The id in the provided node is the id, by which a
+            state-machine can be created.
+          content: 
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400':
+          description:
+            The state-chart wasn't created. An indication about the problem
+            will be provided in the text.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description:
+            The state-chart wasn't found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /action:
+    get:
+      summary: Get the list of all actions, provided by this service.
+      responses:
+        '200':
+          description:
+            The list of the actions, provided by this service.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: 
+                  $ref: '#/components/schemas/ActionInfo'
+  /start/{state-chart-id}:
+    post:
+      summary: Creates a new state-machine form the given state-chart
+      parameters:
+        - name: state-chart-id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/NodeId'
+      description:
+        In contrast to a state-chart, a state machine has active states, with
+        attributes. A state machine with all attribues will be instantiated.
+      responses:
+        '200':
+          description:
+            The Id of the new state-machine.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StateId'
+        '404':
+          description:
+            The requested state-chart couldn't be found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /send/{state-machine-id}/{event-id}:
+    post:
+      summary: Send an event to a state machine
+      description:
+        A state machine may change the state due to two events.
+        1. The event on one of the transitions of the current state is fired.
+        2. The condition on one of the transitions of the current state becomes true.
+        Sending an event is a way to fire the event.
+      parameters:
+        - name: state-machine-id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/StateId'
+        - name: event-id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/EventId'
+      responses:
+        '200':
+          description:
+            It was possible to fire the event in the current state of the state machine.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventId'
+        '404':
+          description:
+            The requested state-machine-id or event-id couldn't be found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /set-var/{state-machine-id}/{variable-id}:
+    post:
+      summary: Set a new value to an existing variable.
+      description:
+        A state machine may change the state due to two events.
+        1. The event on one of the transitions of the current state is fired.
+        2. The condition on one of the transitions of the current state becomes true.
+        Setting a variable may trigger a condition.
+      parameters:
+        - name: state-machine-id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/StateId'
+        - name: variable-id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/VariableId'
+      responses:
+        '200':
+          description:
+            It was possible to change the variable values. A list of the
+            current valid events is provided as a result.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventId'
+        '404':
+          description:
+            The requested state-machine-id or variable-id couldn't be found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  # /state-machine:
+  #   get:
+  #     summary: Provides a list of all state-machines and their current state.
+  #     responses:
+  #       '200':
+  #         description:
+  #           The
+  #         content:
+  #           application/json:
+  #             schema:
+  #               $ref: 
+
+components:
+  schemas:
+    Node:
+      # descripton:
+      #   The node may represent a single state or a complete state-chart.
+      #   If it has no child node, it must have a parent node.
+      #   If it has child nodes. 
+      #   A start node is identified by the id-end ".../start".
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/NodeId'
+        name:
+          type: string
+          maxLength: 4096
+          pattern: '\w[\w\d\-\_]*'
+          example: active
+        description:
+          type: string
+          maxLength: 65536
+          example: The description and intention of the state-chart.
+        on-entry:
+          $ref: '#/components/schemas/ActionCall'
+        on-exit:
+          $ref: '#/components/schemas/ActionCall'
+        start-node:
+          $ref: '#/components/schemas/NodeId'
+        out-transitions:
+          type: array
+          items: 
+            $ref: '#/components/schemas/Transition'
+        attributes:
+          type: array
+          items: 
+            $ref: '#/components/schemas/VariableDeclaration'
+      required:
+        - id
+        - name
+        - description
+        - on-entry
+        - on-exit
+        - start-node
+        - out-transitions
+        - attributes
+
+    VariableDeclaration:
+      # descripton:
+      #   The declaration of state attributes. Actions may operate on these 
+      #   attributes.
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '\w[\w\d\-\_]*'
+          maxLength: 1024
+          example: count
+        type:
+          # description:
+          #   The scalar type of the variable.
+          type: string
+          pattern: '(string|integer|number|boolean)'
+          maxLength: 7
+          example: number
+        value:
+          # description:
+          #   The required initial value of a particular variable (parameter or
+          #   attribute).
+          oneOf: 
+            - type: string
+            - type: integer
+            - type: number
+            - type: boolean
+      required:
+        - name
+        - type
+        - value
+
+    Transition:
+      # description:
+      #   The transition connects a node, where it is associated with, with
+      #   another node. The transition will be guarded by an event or a
+      #   condition. The transition can be connected also with an 
+      # example:
+      #   { guard: { event: "sme:///open", to: "scn:///Bug/in-progress" }
+      type: object
+      properties:
+        guard:
+          $ref: '#/components/schemas/Guard'
+        to: 
+          $ref: '#/components/schemas/NodeId'
+        action-call:
+          $ref: '#/components/schemas/ActionCall'
+      required:
+        - guard
+        - to
+
+    ActionInfo:
+      # description:
+      #   This object provides information regarding a particular action.
+      #   It cannot be changed externaly, but is just for information purposes.
+      #   All actions *must* be implemented by the server, providing this 
+      #   information.
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/ActionId'
+        description:
+          type: string
+          maxLength: 65536
+        parameters:
+          type: array
+          maxLength: 1024
+          items: 
+            $ref: '#/components/schemas/VariableDeclaration'
+      required:
+        - name
+        - description
+        - parameters
+
+    Guard:
+      # description:
+      #   A guard is checking, if the transition should be fired.
+      #   It will be fired, if the configured event was fired or if the
+      #   configured predicate is true.
+      # example:
+      # { event: "sme:///open" }
+      # { predicate: { name: 'eq', parameters: [ "sdv://4711/Bug/age", "21d" ] } }
+      properties:
+        event: 
+          $ref: '#/components/schemas/EventId'
+        predicate:
+          $ref: '#/components/schemas/PredicateCall'
+
+    ActionCall:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/ActionId'
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Parameter'
+      required:
+        - name
+        - parameters
+
+    PredicateCall:
+      # description:
+      #   A predicate, which guards a transition.
+      # example:
+      #   { name: 'eq', parameters: [ "sdv://4711/Bug/age", "21d" ] }
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/PredicateId'
+        parameters:
+          type: array
+          maxLength: 128
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/VariableId'
+              - type: string
+              - type: integer
+              - type: number
+              - type: boolean
+      required:
+        - name
+        - parameters
+
+    Parameter:
+      # description:
+      #   This is the definition of an action parameter.
+      # example:
+      #   { name="email", value="a.b@c.d" }
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/VariableId'
+        value:
+          oneOf:
+            - type: string
+              maxLength: 1024
+            - type: integer
+            - type: number
+            - type: boolean
+      required:
+        - name
+        - value
+
+    StateMachine:
+      # description:
+      #   The instance of a state-chart with current states and the current
+      #   values of the variables.
+      type: object
+      properties:
+        state-chart:
+          $ref: '#/components/schemas/Node'
+        root-state:
+          $ref: '#/components/schemas/StateId'
+        current-state:
+          $ref: '#/components/schemas/StateId'
+      required:
+        - state-chart
+        - root-state
+        - current-state
+
+    ActionId:
+      # description:
+      # example:
+      type: string
+      maxLength: 1024
+      pattern: '\w[\w\d\-\_]*'
+
+    PredicateId:
+      # description:
+      #   The id of a predicate.
+      # example:
+      #   equals
+      #   greater
+      #   lesser
+      type: string
+      maxLength: 1024
+      pattern: '\w[\w\d\-\_]*'
+
+    EventId:
+      # description:
+      #   The id of an event is not directly associated with a state, but with
+      #   the transitions in the state chart. It must not be declared, but will
+      #   be derived from the transitions.
+      # example:
+      #   sme:///open
+      #   sme:///close
+      #   sme:///assign
+      type: string
+      maxLength: 1024
+      pattern: 'sme:///\w[\w\d\.\-\_]*'
+
+    StateId:
+      # description:
+      #   The id of a state or state diagram.
+      #   It is minimum the id of the state diagram and the
+      # example:
+      #   sms:///4711/ - The Id of a state-machine
+      #   sms:///4711/start - The Id of a particular state in this machine
+      #   sms:///4711/in-progress/checking - The Id of a particular sub-state of the machine
+      type: string
+      pattern: 'sms:///[\w\d][\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+      maxLength: 1024
+
+    VariableId:
+      # description
+      #   The id of a variable, constructed from the state id
+      #   smv://{state-machine-id}/{node-id}/{var-name}
+      # example:
+      #   smv:///4711/assignee - A global state-machine-variable
+      #   smv:///4711/in-progress/since - A local variable of a sub-state.
+      type: string
+      pattern: 'smv:///\w[\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+      maxLength: 1024
+
+    NodeId:
+      # description:
+      #   The id of a node is constructed by the hierarchy of node ids.
+      # example:
+      #   scn://Bug/created
+      #   scn://Bug/fixing
+      type: string
+      maxLength: 1024
+      pattern: 'scn:///\w[\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+
+    Error:
+      # description:
+      #   A structured way to deliver a error to the client.
+      # example:
+      #   { id=1000, message: "Inconsitent state-chart definition." }
+      type: object
+      properties:
+        id: 
+          type: integer
+        message:
+          type: string
+          maxLength: 1024
+      required:
+        - id
+        - message
+
