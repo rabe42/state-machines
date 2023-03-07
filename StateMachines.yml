@@ -458,7 +458,7 @@ components:
       # example:
       type: string
       maxLength: 1024
-      pattern: '\w[\w\d\-\_]*'
+      pattern: '^\p{L}[\w\-]*$'
 
     PredicateId:
       # description:
@@ -469,7 +469,7 @@ components:
       #   lesser
       type: string
       maxLength: 1024
-      pattern: '\w[\w\d\-\_]*'
+      pattern: '^\p{L}[\w\-]*$'
 
     EventId:
       # description:
@@ -482,7 +482,7 @@ components:
       #   sme:///assign
       type: string
       maxLength: 1024
-      pattern: 'sme:///\w[\w\d\.\-\_]*'
+      pattern: '^sme:///\p{L}[\w\.\-]*$'
 
     StateId:
       # description:
@@ -493,7 +493,7 @@ components:
       #   sms:///4711/start - The Id of a particular state in this machine
       #   sms:///4711/in-progress/checking - The Id of a particular sub-state of the machine
       type: string
-      pattern: 'sms:///[\w\d][\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+      pattern: '^sms:///\w[\w\.\-]*(/\w[\w\.\-]*)*$'
       maxLength: 1024
 
     VariableId:
@@ -504,7 +504,7 @@ components:
       #   smv:///4711/assignee - A global state-machine-variable
       #   smv:///4711/in-progress/since - A local variable of a sub-state.
       type: string
-      pattern: 'smv:///\w[\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+      pattern: '^smv:///\w[\w\.\-]*(\/\w[\w\.\-]*)*$'
       maxLength: 1024
 
     NodeId:
@@ -515,13 +515,13 @@ components:
       #   scn://Bug/fixing
       type: string
       maxLength: 1024
-      pattern: 'scn:///\w[\w\d\.\-\_]*(\/\w[\w\d\.\-\_]*)*'
+      pattern: '^scn:///\p{L}[\w\.\-]*(/\w[\w\.\-]*)*$'
 
     Error:
       # description:
       #   A structured way to deliver a error to the client.
       # example:
-      #   { id=1000, message: "Inconsitent state-chart definition." }
+      #   { id=1000, message: "Inconsistent state-chart definition." }
       type: object
       properties:
         id: 
