@@ -13,5 +13,9 @@ readme = "Readme.md"
 
 [dependencies]
 open-api-matcher = { path = "../open-api-matcher"}
+tokio = { version = "1", features = ["full"] }
+log = "0"
+env_logger = "0"
+hyper = { version = "0", features = ["full"] }
 
 [dev-dependencies]

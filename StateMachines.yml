@@ -533,3 +533,12 @@ components:
         - id
         - message
 
+  responses:
+    NotFound:
+      description:
+        The requested ressource wasn't found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
