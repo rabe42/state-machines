@@ -586,6 +586,7 @@ dependencies = [
  "hyper",
  "log",
  "open-api-matcher",
+ "thiserror",
  "tokio",
 ]
 

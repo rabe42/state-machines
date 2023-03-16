@@ -1,3 +1,6 @@
+mod state_charts;
+mod error;
+
 use env_logger;
 use log::{debug, info, error};
 use open_api_matcher::{OpenApiResponse, Value, ValidatedValue};
@@ -26,29 +29,29 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
         },
         (&Method::POST, "/state-chart/", p, op) => {
             if let ValidatedValue::Object(sc) = p.get_content() {
-                debug!("");
+                debug!("[main::handle()] POST:/state-chart: {:?}", sc);
             };
-            let mut response = OpenApiResponse::new(op);
+            let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::GET, "/state-chart/{id}", p, op) => {
-            let mut response = OpenApiResponse::new(op);
+        (&Method::GET, "/state-chart/{id}", _p, op) => {
+            let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::POST, "/action/", p, op) => {
-            let mut response = OpenApiResponse::new(op);
+        (&Method::POST, "/action/", _p, op) => {
+            let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::POST, "/start/{state-chart-id}", p, op) => {
-            let mut response = OpenApiResponse::new(op);
+        (&Method::POST, "/start/{state-chart-id}", _p, op) => {
+            let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::POST, "/send/{state-machine-id}/{event-id}", p, op) => {
-            let mut response = OpenApiResponse::new(op);
+        (&Method::POST, "/send/{state-machine-id}/{event-id}", _p, op) => {
+            let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::POST, "/set-var/{state-machine-id}/{variable-id}", p, op) => {
-            let mut response = OpenApiResponse::new(op);
+        (&Method::POST, "/set-var/{state-machine-id}/{variable-id}", _p, op) => {
+            let response = OpenApiResponse::new(op);
             response
         },
         (&Method::GET, "/hello/{name}", p, op) => {

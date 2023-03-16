@@ -337,7 +337,7 @@ components:
           $ref: '#/components/schemas/Guard'
         to: 
           $ref: '#/components/schemas/NodeId'
-        action-call:
+        action:
           $ref: '#/components/schemas/ActionCall'
       required:
         - guard
