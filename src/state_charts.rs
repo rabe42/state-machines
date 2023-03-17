@@ -185,15 +185,6 @@ pub struct VariableDeclaration {
     r#type: String,
     value: VariableValue,
 }
-impl VariableDeclaration {
-    fn new(name: &str, r#type: &str, value: VariableValue) -> VariableDeclaration {
-        VariableDeclaration {
-            name: name.into(),
-            r#type: r#type.into(),
-            value,
-        }
-    }
-}
 impl TryFrom<&ValidatedValue> for VariableDeclaration {
     type Error = StateChartError;
 
@@ -212,6 +203,7 @@ impl TryFrom<&ValidatedValue> for VariableDeclaration {
 }
 
 /// The variable value holds the value of a variable attribute or parameter.
+#[derive(Debug, PartialEq)]
 pub enum VariableValue {
     String(String),
     Integer(i64),
@@ -303,11 +295,9 @@ fn parameters_from_validated_values(values: &ValidatedValue)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
 
     #[test]
     fn test_get_mandatory() {
@@ -319,7 +309,6 @@ mod tests {
 
     #[test]
     fn test_parameter_try_into() {
-
         let mut parameter_a: BTreeMap<String, ValidatedValue> = BTreeMap::new();
         parameter_a.insert("name".into(), ValidatedValue::String("A".into()));
         parameter_a.insert("value".into(), ValidatedValue::Bool(true));
@@ -357,10 +346,36 @@ mod tests {
     }
 
     #[test]
+    fn test_variable_declaration_try_into() {
+        let mut vd1_bt: BTreeMap<String, ValidatedValue> = BTreeMap::new();
+        vd1_bt.insert("name".into(), ValidatedValue::String("var1".into()));
+        vd1_bt.insert("type".into(), ValidatedValue::String("integer".into()));
+        vd1_bt.insert("value".into(), ValidatedValue::Integer(1));
+        let vd1 = ValidatedValue::Object(vd1_bt);
+        let _vd: VariableDeclaration = (&vd1).try_into().unwrap();
+    }
+
+    #[test]
     fn test_attributes_from_vv() {
-        // TODO: Create a list of ValidatedValues with objects with the attributes of the
+        // Create a list of ValidatedValues with objects with the attributes of the
         // VariableDeclaration
-        let mut _vd1 = VariableDeclaration::new("var1", "integer", VariableValue::Integer(1));
+        let mut vd1_bt: BTreeMap<String, ValidatedValue> = BTreeMap::new();
+        vd1_bt.insert("name".into(), ValidatedValue::String("var1".into()));
+        vd1_bt.insert("type".into(), ValidatedValue::String("integer".into()));
+        vd1_bt.insert("value".into(), ValidatedValue::Integer(1));
+        let vd1 = ValidatedValue::Object(vd1_bt);
+        let mut vd2_bt: BTreeMap<String, ValidatedValue> = BTreeMap::new();
+        vd2_bt.insert("name".into(), ValidatedValue::String("var2".into()));
+        vd2_bt.insert("type".into(), ValidatedValue::String("boolean".into()));
+        vd2_bt.insert("value".into(), ValidatedValue::Bool(true));
+        let vd2 = ValidatedValue::Object(vd2_bt);
+
+        let v = vec![vd1, vd2];
+        let attributes = attributes_from_validated_value(&ValidatedValue::Array(v)).unwrap();
+        assert_eq!(attributes.len(), 2);
+        assert_eq!(attributes[0].name, "var1");
+        assert_eq!(attributes[0].value, VariableValue::Integer(1));
+        // let _vd1 = VariableDeclaration::new("var1", "integer", VariableValue::Integer(1));
     }
 
 }
