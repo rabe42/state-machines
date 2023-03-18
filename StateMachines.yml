@@ -487,7 +487,6 @@ components:
     StateId:
       # description:
       #   The id of a state or state diagram.
-      #   It is minimum the id of the state diagram and the
       # example:
       #   sms:///4711/ - The Id of a state-machine
       #   sms:///4711/start - The Id of a particular state in this machine

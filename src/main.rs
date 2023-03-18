@@ -1,4 +1,5 @@
 mod state_charts;
+mod state_machine;
 mod error;
 
 use env_logger;
