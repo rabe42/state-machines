@@ -262,7 +262,7 @@ components:
         name:
           type: string
           maxLength: 4096
-          pattern: '\w[\w\d\-\_]*'
+          pattern: '\w[\w\-_]*'
           example: active
         description:
           type: string
@@ -282,15 +282,12 @@ components:
           type: array
           items: 
             $ref: '#/components/schemas/VariableDeclaration'
+        # nodes:
+        #   type: array
+        #   items:
+        #     $ref: '#/components/schemas/Node'
       required:
-        - id
         - name
-        - description
-        - on-entry
-        - on-exit
-        - start-node
-        - out-transitions
-        - attributes
 
     VariableDeclaration:
       # descripton:
@@ -300,7 +297,7 @@ components:
       properties:
         name:
           type: string
-          pattern: '\w[\w\d\-\_]*'
+          pattern: '\w[\w\-_]*'
           maxLength: 1024
           example: count
         type:
@@ -503,7 +500,7 @@ components:
       #   smv:///4711/assignee - A global state-machine-variable
       #   smv:///4711/in-progress/since - A local variable of a sub-state.
       type: string
-      pattern: '^smv:///\w[\w\.\-]*(\/\w[\w\.\-]*)*$'
+      pattern: '^smv:///\w[\w\.\-]*(/\w[\w\.\-]*)*$'
       maxLength: 1024
 
     NodeId:

@@ -64,7 +64,7 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
         },
         _ => {
             error!("Unexpected match!");
-            OpenApiResponse::error("Unexpected matched request!".into())
+            OpenApiResponse::fall_through()
         }
     }
 }

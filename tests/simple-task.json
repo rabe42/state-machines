@@ -1,0 +1,31 @@
+{
+    "name": "Simple-Task",
+    "start-node": "scn:///Simple-Task/New",
+    "nodes": [
+        {
+            "name": "New",
+            "transitions": [
+                {
+                    "guard": "sme:///start",
+                    "to": "scn:///Simple-Task/In-Progress"
+                }
+            ]
+        },
+        {
+            "name": "In-Progress",
+            "transitions": [
+                {
+                    "guard": "sme:///cancel",
+                    "to": "scn:///Simple-Task/New"
+                },
+                {
+                    "guard": "sme:///done",
+                    "to": "scn:///Simple-Task/Done"
+                }
+            ]
+        },
+        {
+            "name": "Done"
+        }
+    ]
+}
