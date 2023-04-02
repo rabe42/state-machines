@@ -3,19 +3,19 @@ use open_api_matcher::ValidatedValue;
 use crate::error::StateChartError;
 
 /// A system wide unique Id for a node.
-type NodeId = String;
+pub type NodeId = String;
 
 /// A system wide unique Id of a action.
-type ActionId = String;
+pub type ActionId = String;
 
 /// A system wide unique Id of a variable.
-type VariableId = String;
+pub type VariableId = String;
 
 /// A system wide unique Id of a event.
-type EventId = String;
+pub type EventId = String;
 
 /// A system wide unique Id of a predicate.
-type PredicateId = String;
+pub type PredicateId = String;
 
 /// The node is the heart of the state chart definition. A node can be a single state or a state
 /// chart of its own.
