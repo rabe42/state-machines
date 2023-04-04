@@ -4,7 +4,7 @@ use regex::Regex;
 use uuid::Uuid;
 
 /// A system wide unique Id for a node.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NodeId(String);
 impl NodeId {
     const REGEX: &'static str = r"^scn:///(?P<path>\p{L}[\w\.\-]*(/\w[\w\.\-]*)*)$";

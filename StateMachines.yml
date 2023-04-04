@@ -277,10 +277,10 @@ components:
           type: array
           items: 
             $ref: '#/components/schemas/VariableDeclaration'
-        # nodes:
-        #   type: array
-        #   items:
-        #     $ref: '#/components/schemas/Node'
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
       required:
         - id
 

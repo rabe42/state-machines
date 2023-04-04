@@ -66,11 +66,11 @@ impl TryFrom<&ValidatedValue> for Node {
                 }
                 None => None,
             };
-            let start_node: Option<NodeId> = match attributes.get("start_node") {
+            let start_node: Option<NodeId> = match attributes.get("start-node") {
                 Some(sn) => Some(sn.try_into()?),
                 None => None,
             };
-            let out_transitions = match attributes.get("out_transitions") {
+            let out_transitions = match attributes.get("out-transitions") {
                 Some(ot) => transitions_from_validated_value(ot)?,
                 None => Vec::new(),
             };
@@ -439,6 +439,9 @@ mod tests {
         let sc = std::fs::read_to_string("tests/simple-task.json").unwrap();
         let sc_schema = open_api.get_schema("#/components/schemas/Node").unwrap();
         let vvsc = ValidatedValue::new(&sc, &sc_schema, &open_api).unwrap();
-        let _node: Node = (&vvsc).try_into().unwrap();
+        let node: Node = (&vvsc).try_into().unwrap();
+        assert_eq!(NodeId::new("Simple-Task"), node.id);
+        assert_eq!(NodeId::new("Simple-Task/New"), node.start_node.unwrap());
+        assert_eq!(3, node.nodes.len());
     }
 }

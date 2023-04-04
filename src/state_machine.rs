@@ -45,6 +45,7 @@ mod tests {
         let sc_schema = open_api.get_schema("#/components/schemas/Node").unwrap();
         let vvsc = ValidatedValue::new(&sc, &sc_schema, &open_api).unwrap();
         let node: Node = (&vvsc).try_into().unwrap();
+        let _state_machine = StateMachine::new(node).unwrap();
     }
 
     #[test]
