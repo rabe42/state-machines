@@ -259,11 +259,6 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/NodeId'
-        name:
-          type: string
-          maxLength: 4096
-          pattern: '\w[\w\-_]*'
-          example: active
         description:
           type: string
           maxLength: 65536
@@ -287,7 +282,7 @@ components:
         #   items:
         #     $ref: '#/components/schemas/Node'
       required:
-        - name
+        - id
 
     VariableDeclaration:
       # descripton:
@@ -439,10 +434,10 @@ components:
       #   values of the variables.
       type: object
       properties:
+        id:
+          $ref: '#/components/schemas/StateId'
         state-chart:
           $ref: '#/components/schemas/Node'
-        root-state:
-          $ref: '#/components/schemas/StateId'
         current-state:
           $ref: '#/components/schemas/StateId'
       required:

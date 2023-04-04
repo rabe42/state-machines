@@ -18,5 +18,8 @@ tokio = { version = "1", features = ["full"] }
 log = "0"
 env_logger = "0"
 hyper = { version = "0", features = ["full"] }
+uuid = { version = "1", features = ["v4", "fast-rng"] }
+rusqlite = { version = "0", features = ["serde_json", "blob"] }
+regex = { version = "1" }
 
 [dev-dependencies]

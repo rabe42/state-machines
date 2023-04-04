@@ -1,9 +1,7 @@
-use std::collections::BTreeMap;
-use open_api_matcher::ValidatedValue;
 use crate::error::StateChartError;
-
-/// A system wide unique Id for a node.
-pub type NodeId = String;
+use crate::ids::NodeId;
+use open_api_matcher::ValidatedValue;
+use std::collections::BTreeMap;
 
 /// A system wide unique Id of a action.
 pub type ActionId = String;
@@ -22,56 +20,71 @@ pub type PredicateId = String;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct Node {
-    name: String,
+    id: NodeId,
     description: Option<String>,
     on_entry: Option<ActionCall>,
     on_exit: Option<ActionCall>,
-    start_node: Box<Node>,
+    start_node: Option<NodeId>,
     out_transitions: Vec<Transition>,
     attributes: Vec<VariableDeclaration>,
     nodes: Vec<Node>,
+}
+impl Node {
+    pub fn id(&self) -> &NodeId {
+        &self.id
+    }
+
+    /// Provides access to the optional start node of the state chart.
+    pub fn start_node(&self) -> Option<&NodeId> {
+        self.start_node.as_ref()
+    }
 }
 /// Constructs a node from the validated value.
 impl TryFrom<&ValidatedValue> for Node {
     type Error = StateChartError;
 
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error>
-    {
+    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::Object(attributes) = value {
             let on_entry = match attributes.get("on-entry") {
                 Some(vac) => {
                     let ac: ActionCall = vac.try_into()?;
                     Some(ac)
-                },
+                }
                 None => None,
             };
             let on_exit = match attributes.get("on-exit") {
                 Some(vac) => {
                     let ac: ActionCall = vac.try_into()?;
                     Some(ac)
-                },
+                }
                 None => None,
             };
             let description = match attributes.get("description") {
                 Some(vd) => {
                     let d: String = vd.try_into()?;
                     Some(d)
-                },
+                }
                 None => None,
             };
+            let start_node: Option<NodeId> = match attributes.get("start_node") {
+                Some(sn) => Some(sn.try_into()?),
+                None => None,
+            };
+            let out_transitions = match attributes.get("out_transitions") {
+                Some(ot) => transitions_from_validated_value(ot)?,
+                None => Vec::new(),
+            };
             Ok(Node {
-                name: get_mandatory(&attributes, "name")?.try_into()?,
+                id: get_mandatory(&attributes, "id")?.try_into()?,
                 description,
                 on_entry,
                 on_exit,
-                start_node: Box::new(get_mandatory(&attributes, "start_node")?.try_into()?),
-                out_transitions: transitions_from_validated_value(
-                    get_mandatory(attributes, "out_transitions")?)?,
+                start_node,
+                out_transitions,
                 attributes: attributes_from_validated_value(attributes.get("attributes"))?,
                 nodes: nodes_from_validated_value(attributes.get("nodes"))?,
             })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -90,10 +103,10 @@ impl TryFrom<&ValidatedValue> for ActionCall {
     fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::Object(attributes) = value {
             let name: ActionId = get_mandatory(attributes, "name")?.try_into()?;
-            let parameters: Vec<Parameter> = parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
+            let parameters: Vec<Parameter> =
+                parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
             Ok(ActionCall { name, parameters })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -113,8 +126,7 @@ impl TryFrom<&ValidatedValue> for Parameter {
             let name: String = get_mandatory(attributes, "name")?.try_into()?;
             let value: VariableValue = get_mandatory(attributes, "value")?.try_into()?;
             Ok(Self { name, value })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -134,8 +146,7 @@ pub struct Transition {
 impl TryFrom<&ValidatedValue> for Transition {
     type Error = StateChartError;
 
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error>
-    {
+    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::Object(attributes) = value {
             let guard = get_mandatory(attributes, "guard")?.try_into()?;
             let to = get_mandatory(attributes, "to")?.try_into()?;
@@ -144,11 +155,10 @@ impl TryFrom<&ValidatedValue> for Transition {
                 Some(v_action) => {
                     let ac: ActionCall = v_action.try_into()?;
                     Some(ac)
-                },
+                }
             };
             Ok(Transition { guard, to, action })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -166,16 +176,13 @@ pub enum Guard {
 impl TryFrom<&ValidatedValue> for Guard {
     type Error = StateChartError;
 
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error>
-    {
+    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::String(event_id) = value {
             Ok(Guard::Event(event_id.into()))
-        }
-        else if let ValidatedValue::Object(_) = value {
+        } else if let ValidatedValue::Object(_) = value {
             let predicate_call = value.try_into()?;
             Ok(Guard::Predicate(predicate_call))
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -189,18 +196,16 @@ pub struct PredicateCall {
     name: PredicateId,
     parameters: Vec<Parameter>,
 }
-impl TryFrom<&ValidatedValue> for PredicateCall
-{
+impl TryFrom<&ValidatedValue> for PredicateCall {
     type Error = StateChartError;
 
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error>
-    {
+    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::Object(attributes) = value {
             let name: PredicateId = get_mandatory(attributes, "name")?.try_into()?;
-            let parameters = parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
+            let parameters =
+                parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
             Ok(PredicateCall { name, parameters })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -224,8 +229,7 @@ impl TryFrom<&ValidatedValue> for VariableDeclaration {
                 r#type: get_mandatory(attributes, "type")?.try_into()?,
                 value: get_mandatory(attributes, "value")?.try_into()?,
             })
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
     }
@@ -248,8 +252,7 @@ impl Default for VariableValue {
 impl TryFrom<&ValidatedValue> for VariableValue {
     type Error = StateChartError;
 
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error>
-    {
+    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         match value {
             ValidatedValue::String(s) => Ok(Self::String(s.into())),
             ValidatedValue::Integer(i) => Ok(Self::Integer(*i)),
@@ -262,21 +265,21 @@ impl TryFrom<&ValidatedValue> for VariableValue {
 }
 
 /// Retrieves a mandatory attribute from a standard map.
-fn get_mandatory<'a>(attributes: &'a BTreeMap<String, ValidatedValue>, name: &str) 
-    -> Result<&'a ValidatedValue, StateChartError>
-{
+fn get_mandatory<'a>(
+    attributes: &'a BTreeMap<String, ValidatedValue>,
+    name: &str,
+) -> Result<&'a ValidatedValue, StateChartError> {
     if let Some(attribute) = attributes.get(name) {
         Ok(attribute)
-    }
-    else {
+    } else {
         Err(StateChartError::MandatoryAttributeMissing(name.into()))
     }
 }
 
 /// Retrieves the transitions of a node from the transition.
-fn transitions_from_validated_value(value: &ValidatedValue)
-    -> Result<Vec<Transition>, StateChartError>
-{
+fn transitions_from_validated_value(
+    value: &ValidatedValue,
+) -> Result<Vec<Transition>, StateChartError> {
     if let ValidatedValue::Array(transitions) = value {
         let mut result = Vec::new();
         for v_transition in transitions {
@@ -284,16 +287,15 @@ fn transitions_from_validated_value(value: &ValidatedValue)
             result.push(transition)
         }
         Ok(result)
-    }
-    else {
+    } else {
         Err(StateChartError::UnexpectedType)
     }
 }
 
 /// Retrieves the attributes/variables from the array.
-fn attributes_from_validated_value(value: Option<&ValidatedValue>)
-    -> Result<Vec<VariableDeclaration>, StateChartError>
-{
+fn attributes_from_validated_value(
+    value: Option<&ValidatedValue>,
+) -> Result<Vec<VariableDeclaration>, StateChartError> {
     if let Some(value) = value {
         if let ValidatedValue::Array(attribs) = value {
             let mut result: Vec<VariableDeclaration> = Vec::new();
@@ -302,19 +304,17 @@ fn attributes_from_validated_value(value: Option<&ValidatedValue>)
                 result.push(vd);
             }
             Ok(result)
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
-    }
-    else {
+    } else {
         Ok(Vec::new())
     }
 }
 
-fn nodes_from_validated_value(value: Option<&ValidatedValue>)
-    -> Result<Vec<Node>, StateChartError>
-{
+fn nodes_from_validated_value(
+    value: Option<&ValidatedValue>,
+) -> Result<Vec<Node>, StateChartError> {
     if let Some(v_value) = value {
         if let ValidatedValue::Array(nodes) = v_value {
             let mut result: Vec<Node> = Vec::new();
@@ -323,20 +323,18 @@ fn nodes_from_validated_value(value: Option<&ValidatedValue>)
                 result.push(node);
             }
             Ok(result)
-        }
-        else {
+        } else {
             Err(StateChartError::UnexpectedType)
         }
-    }
-    else {
+    } else {
         Ok(Vec::new())
     }
 }
 
 /// Derives a vector of parameters from an array of validated values.
-fn parameters_from_validated_values(values: &ValidatedValue)
-    -> Result<Vec<Parameter>, StateChartError>
-{
+fn parameters_from_validated_values(
+    values: &ValidatedValue,
+) -> Result<Vec<Parameter>, StateChartError> {
     if let ValidatedValue::Array(values) = values {
         let mut result = Vec::new();
         for v_param in values {
@@ -344,8 +342,7 @@ fn parameters_from_validated_values(values: &ValidatedValue)
             result.push(param);
         }
         Ok(result)
-    }
-    else {
+    } else {
         Err(StateChartError::UnexpectedType)
     }
 }
@@ -397,7 +394,8 @@ mod tests {
         v_parameters.push(ValidatedValue::Object(parameter_b));
 
         // Check, if the paramters can be extracted as exprected.
-        let parameters = parameters_from_validated_values(&ValidatedValue::Array(v_parameters)).unwrap();
+        let parameters =
+            parameters_from_validated_values(&ValidatedValue::Array(v_parameters)).unwrap();
         assert_eq!(2, parameters.len());
     }
 
@@ -440,6 +438,7 @@ mod tests {
         let open_api = OpenApi::new(&open_api_file).unwrap();
         let sc = std::fs::read_to_string("tests/simple-task.json").unwrap();
         let sc_schema = open_api.get_schema("#/components/schemas/Node").unwrap();
-        let _vvsc = ValidatedValue::new(&sc, &sc_schema, &open_api).unwrap();
+        let vvsc = ValidatedValue::new(&sc, &sc_schema, &open_api).unwrap();
+        let _node: Node = (&vvsc).try_into().unwrap();
     }
 }

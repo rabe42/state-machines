@@ -1,9 +1,9 @@
 {
-    "name": "Simple-Task",
+    "id": "scn:///Simple-Task",
     "start-node": "scn:///Simple-Task/New",
     "nodes": [
         {
-            "name": "New",
+            "id": "scn:///Simple-Task/New",
             "transitions": [
                 {
                     "guard": "sme:///start",
@@ -12,7 +12,7 @@
             ]
         },
         {
-            "name": "In-Progress",
+            "id": "scn:///Simple-Task/In-Progress",
             "transitions": [
                 {
                     "guard": "sme:///cancel",
@@ -25,7 +25,7 @@
             ]
         },
         {
-            "name": "Done"
+            "id": "scn:///Simple-Task/Done"
         }
     ]
 }

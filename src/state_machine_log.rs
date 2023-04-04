@@ -1,12 +1,21 @@
-use std::system::SystemTime;
-use crate::state_chart::{VariableId, NodeId};
+use crate::ids::NodeId;
+use crate::state_charts::VariableId;
+use std::time::SystemTime;
 
 /// The log of all events, variable changes and node changes of a particular state machine.
 pub struct StateMachineLog {
+    // Database connection...
+}
+impl StateMachineLog {
+    /// Initializes the log with the connection to the log store.
+    pub fn init() {}
+
+    /// Creates a new log entry.
+    pub fn log(entry: LogEntryType) {}
 }
 
 /// The log entry will document when a operation was conducted.
-pub struct StateMachineLogEntry {
+struct StateMachineLogEntry {
     timestamp: SystemTime,
     entry: LogEntryType,
 }
@@ -19,6 +28,4 @@ pub enum LogEntryType {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
