@@ -11,6 +11,9 @@ use open_api_matcher::{OpenApiResponse, ValidatedValue, Value};
 use std::fs::File;
 use std::net::SocketAddr;
 
+use crate::state_charts::Node;
+use crate::error::StateChartError;
+
 #[tokio::main]
 pub async fn main() {
     env_logger::init();
@@ -27,44 +30,51 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
             let mut response = OpenApiResponse::new(op);
             response.content(Vec::new().into());
             response
-        }
+        },
         (&Method::POST, "/state-chart/", p, op) => {
-            if let ValidatedValue::Object(sc) = p.get_content() {
-                debug!("[main::handle()] POST:/state-chart: {:?}", sc);
-            };
-            let response = OpenApiResponse::new(op);
+            let mut response = OpenApiResponse::new(op);
+            let node_result: Result<Node, StateChartError> = p.get_content().try_into();
+            match node_result {
+                Ok(state_chart) => {
+                    debug!("Received state chart successfully:\n{:?}", state_chart);
+                    response.content(state_chart.id().into());
+                },
+                Err(err) => {
+                    response.content(Value::String("Husten...".into()));
+                }
+            }
             response
-        }
+        },
         (&Method::GET, "/state-chart/{id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        }
+        },
         (&Method::POST, "/action/", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        }
+        },
         (&Method::POST, "/start/{state-chart-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        }
+        },
         (&Method::POST, "/send/{state-machine-id}/{event-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        }
+        },
         (&Method::POST, "/set-var/{state-machine-id}/{variable-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        }
+        },
         (&Method::GET, "/hello/{name}", p, op) => {
             debug!("Matched '/hello/{{name}}'");
             let answer = format!("Hello {}!", p.get_path_parameter("name"));
             let mut response = OpenApiResponse::new(op);
             response.content(Value::String(answer));
             response
-        }
+        },
         _ => {
             error!("Unexpected match!");
             OpenApiResponse::fall_through()
-        }
+        },
     }
 }

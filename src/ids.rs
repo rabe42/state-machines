@@ -1,5 +1,5 @@
 use crate::error::StateChartError;
-use open_api_matcher::ValidatedValue;
+use open_api_matcher::{Value, ValidatedValue};
 use regex::Regex;
 use uuid::Uuid;
 
@@ -53,10 +53,38 @@ impl From<String> for NodeId {
     }
 }
 
-/// Convenience trait to transfor &str to NodeIds.
+/// Convenience trait to transform &str to NodeIds.
 impl From<&str> for NodeId {
     fn from(value: &str) -> Self {
         NodeId(value.into())
+    }
+}
+
+/// Convenience trait to transform to String.
+impl From<NodeId> for String {
+    fn from(value: NodeId) -> Self {
+        let NodeId(content) = value;
+        content
+    }
+}
+
+impl <'a>From<&'a NodeId> for &'a String {
+    fn from(value: &'a NodeId) -> &'a String {
+        let NodeId(content) = value;
+        content
+    }
+}
+
+impl From<&NodeId> for String {
+    fn from(value: &NodeId) -> String {
+        let NodeId(content) = value;
+        content.clone()
+    }
+}
+
+impl From<&NodeId> for Value {
+    fn from(node_id: &NodeId) -> Self {
+        Value::String(node_id.into())
     }
 }
 

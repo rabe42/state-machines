@@ -18,7 +18,7 @@ pub type PredicateId = String;
 /// The node is the heart of the state chart definition. A node can be a single state or a state
 /// chart of its own.
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     id: NodeId,
     description: Option<String>,
@@ -91,7 +91,7 @@ impl TryFrom<&ValidatedValue> for Node {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ActionCall {
     name: ActionId,
     parameters: Vec<Parameter>,
@@ -113,7 +113,7 @@ impl TryFrom<&ValidatedValue> for ActionCall {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Parameter {
     name: VariableId,
     value: VariableValue,
@@ -134,7 +134,7 @@ impl TryFrom<&ValidatedValue> for Parameter {
 
 /// The transition from one node to another.
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Transition {
     /// The check, which tests, if the transaction is activated.
     guard: Guard,
@@ -167,7 +167,7 @@ impl TryFrom<&ValidatedValue> for Transition {
 /// The guard on a trasition holds the condition under which a transaction is activated.
 /// It will be evaluated by the state machine runtime.
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Guard {
     Event(EventId),
     Predicate(PredicateCall),
@@ -191,7 +191,7 @@ impl TryFrom<&ValidatedValue> for Guard {
 /// The call of a predicate may be a guard. The predicate of all transactions of the current state
 /// will be evaluated when ever a variable value was modified.
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PredicateCall {
     name: PredicateId,
     parameters: Vec<Parameter>,
@@ -213,7 +213,7 @@ impl TryFrom<&ValidatedValue> for PredicateCall {
 
 /// Declares a variable inside of a state chart state.
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VariableDeclaration {
     name: String,
     r#type: String,
