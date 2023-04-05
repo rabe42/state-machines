@@ -3,6 +3,7 @@ mod ids;
 mod state_charts;
 mod state_machine;
 mod state_machine_log;
+mod warehouse;
 
 use env_logger;
 use hyper::Method;

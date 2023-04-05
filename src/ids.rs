@@ -4,7 +4,7 @@ use regex::Regex;
 use uuid::Uuid;
 
 /// A system wide unique Id for a node.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NodeId(String);
 impl NodeId {
     const REGEX: &'static str = r"^scn:///(?P<path>\p{L}[\w\.\-]*(/\w[\w\.\-]*)*)$";
@@ -91,7 +91,7 @@ impl From<&NodeId> for Value {
 /// The state holds a reference to the root and the current state of a state chart.
 /// @see StateMachines.yml
 /// pattern: '^sms:///\w[\w\.\-]*(/\w[\w\.\-]*)*$'
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StateId(String);
 impl StateId {
     const REGEX: &'static str = r"^sms:///(?P<id>\w[\w\.-]*)(/\w[\w\.-]*)*$";

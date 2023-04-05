@@ -28,6 +28,11 @@ impl StateMachine {
         }
     }
 
+    pub fn id(&self) -> &StateId
+    {
+        &self.id
+    }
+
     // TODO: generate a StateId from the NodeId of the state chart.
     // TODO: The operations regarding the setting of variables and events goes here.
 }
