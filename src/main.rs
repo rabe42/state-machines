@@ -43,9 +43,8 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
             let response = OpenApiResponse::new(op);
             response
         },
-        (&Method::POST, "/start/{state-chart-id}", _p, op) => {
-            let response = OpenApiResponse::new(op);
-            response
+        (&Method::POST, "/start/{state-chart-id}", p, op) => {
+            start_state_machine(p, op).await
         },
         (&Method::POST, "/send/{state-machine-id}/{event-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
@@ -84,9 +83,13 @@ async fn create_state_chart(p: &RequestParamters, op: &OpenApiOperation) -> Open
         Err(err) => {
             error!("[main::create_state_chart()]: {}", err);
             response.set_mime_type("application/json".into());
-            response.content(Value::String("Husten...".into()));
+            response.content(err.into());
         }
     }
     response
 }
 
+async fn start_state_machine(p: &RequestParamters, op: &OpenApiOperation) -> OpenApiResponse {
+    let response = OpenApiResponse::new(op);
+    response
+}
