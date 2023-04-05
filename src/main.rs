@@ -7,7 +7,7 @@ mod state_machine_log;
 use env_logger;
 use hyper::Method;
 use log::{debug, error, info};
-use open_api_matcher::{OpenApiResponse, ValidatedValue, Value};
+use open_api_matcher::{OpenApiResponse, Value, RequestParamters, OpenApiOperation};
 use std::fs::File;
 use std::net::SocketAddr;
 
@@ -24,6 +24,7 @@ pub async fn main() {
     open_api_matcher::service::start(addr, &file, Box::new(handle)).await;
 }
 
+/// The central function, where all request must be handled.
 async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResponse {
     match request.into_match() {
         (&Method::GET, "/state-chart/", _p, op) => {
@@ -32,18 +33,7 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
             response
         },
         (&Method::POST, "/state-chart/", p, op) => {
-            let mut response = OpenApiResponse::new(op);
-            let node_result: Result<Node, StateChartError> = p.get_content().try_into();
-            match node_result {
-                Ok(state_chart) => {
-                    debug!("Received state chart successfully:\n{:?}", state_chart);
-                    response.content(state_chart.id().into());
-                },
-                Err(err) => {
-                    response.content(Value::String("Husten...".into()));
-                }
-            }
-            response
+            create_state_chart(p, op).await
         },
         (&Method::GET, "/state-chart/{id}", _p, op) => {
             let response = OpenApiResponse::new(op);
@@ -78,3 +68,25 @@ async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResp
         },
     }
 }
+
+/// Creates and saves a new state chart, from the already validated parameters. The only validation
+/// which needs to happen here, is the validation, based on semantic level. This might be a wrong
+/// defintion of the state chart, where the start state might be missing.
+async fn create_state_chart(p: &RequestParamters, op: &OpenApiOperation) -> OpenApiResponse {
+    debug!("[main::create_state_chart()]");
+    let mut response = OpenApiResponse::new(op);
+    let node_result: Result<Node, StateChartError> = p.get_content().try_into();
+    match node_result {
+        Ok(state_chart) => {
+            debug!("Received state chart successfully:\n{:?}", state_chart);
+            response.content(state_chart.id().into());
+        },
+        Err(err) => {
+            error!("[main::create_state_chart()]: {}", err);
+            response.set_mime_type("application/json".into());
+            response.content(Value::String("Husten...".into()));
+        }
+    }
+    response
+}
+
