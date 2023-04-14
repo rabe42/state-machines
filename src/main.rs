@@ -1,22 +1,22 @@
 mod error;
 mod ids;
+mod sql;
 mod state_charts;
 mod state_machine;
 mod state_machine_log;
 mod warehouse;
-mod sql;
 
 use env_logger;
 use hyper::Method;
 use log::{debug, error, info};
-use open_api_matcher::{OpenApiResponse, Value, RequestParamters, OpenApiOperation};
-use std::fs::File;
-use std::net::SocketAddr;
+use open_api_matcher::{OpenApiOperation, OpenApiResponse, RequestParamters, Value};
 use r2d2::{ManageConnection, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
+use std::fs::File;
+use std::net::SocketAddr;
 
-use crate::state_charts::Node;
 use crate::error::StateChartError;
+use crate::state_charts::Node;
 
 // TODO: Create a database for managing the state state_charts
 // TODO: Create a database for managing the state machines
@@ -36,63 +36,57 @@ pub async fn main() {
 }
 
 /// Creates and initialize the database connection pool.
-fn create_db_connection() -> Pool<SqliteConnectionManager>
-{
+fn create_db_connection() -> Pool<SqliteConnectionManager> {
     let manager = r2d2_sqlite::SqliteConnectionManager::memory();
-    let pool = Pool::builder()
-        .max_size(10)
-        .build(manager)
-        .unwrap();
+    let pool = Pool::builder().max_size(10).build(manager).unwrap();
     pool
 }
 
-fn init_data_modell<B: ManageConnection>(pool: Pool<B>)
-{
+fn init_data_modell<B: ManageConnection>(pool: Pool<B>) {
     let connection = pool.get().unwrap();
     // FIXME: Here we have to call the create() method of the different entities.
 }
 
 /// The central function, where all request must be handled.
-async fn handle<M: ManageConnection>(request: open_api_matcher::service::RequestMatch, _ctx: Pool<M>) -> OpenApiResponse {
+async fn handle<M: ManageConnection>(
+    request: open_api_matcher::service::RequestMatch,
+    _ctx: Pool<M>,
+) -> OpenApiResponse {
     match request.into_match() {
         (&Method::GET, "/state-chart/", _p, op) => {
             let mut response = OpenApiResponse::new(op);
             response.content(Vec::new().into());
             response
-        },
-        (&Method::POST, "/state-chart/", p, op) => {
-            create_state_chart(p, op).await
-        },
+        }
+        (&Method::POST, "/state-chart/", p, op) => create_state_chart(p, op).await,
         (&Method::GET, "/state-chart/{id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        },
+        }
         (&Method::POST, "/action/", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        },
-        (&Method::POST, "/start/{state-chart-id}", p, op) => {
-            start_state_machine(p, op).await
-        },
+        }
+        (&Method::POST, "/start/{state-chart-id}", p, op) => start_state_machine(p, op).await,
         (&Method::POST, "/send/{state-machine-id}/{event-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        },
+        }
         (&Method::POST, "/set-var/{state-machine-id}/{variable-id}", _p, op) => {
             let response = OpenApiResponse::new(op);
             response
-        },
+        }
         (&Method::GET, "/hello/{name}", p, op) => {
             debug!("Matched '/hello/{{name}}'");
             let answer = format!("Hello {}!", p.get_path_parameter("name"));
             let mut response = OpenApiResponse::new(op);
             response.content(Value::String(answer));
             response
-        },
+        }
         _ => {
             error!("Unexpected match!");
             OpenApiResponse::fall_through()
-        },
+        }
     }
 }
 
@@ -107,7 +101,7 @@ async fn create_state_chart(p: &RequestParamters, op: &OpenApiOperation) -> Open
         Ok(state_chart) => {
             debug!("Received state chart successfully:\n{:?}", state_chart);
             response.content(state_chart.id().into());
-        },
+        }
         Err(err) => {
             error!("[main::create_state_chart()]: {}", err);
             response.set_mime_type("application/json".into());

@@ -28,8 +28,7 @@ impl StateMachine {
         }
     }
 
-    pub fn id(&self) -> &StateId
-    {
+    pub fn id(&self) -> &StateId {
         &self.id
     }
 

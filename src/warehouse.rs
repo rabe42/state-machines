@@ -1,7 +1,7 @@
 use crate::{
     ids::{NodeId, StateId},
     state_charts::Node,
-    state_machine::StateMachine
+    state_machine::StateMachine,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -19,7 +19,10 @@ struct Warehouse {
 }
 impl Warehouse {
     pub fn new() -> Warehouse {
-        Warehouse { state_charts: HashMap::new(), state_machines: HashMap::new() }
+        Warehouse {
+            state_charts: HashMap::new(),
+            state_machines: HashMap::new(),
+        }
     }
 
     pub fn get_all_state_charts(&self) -> Vec<Node> {
@@ -40,7 +43,7 @@ impl Warehouse {
     }
 
     pub fn save_state_machine(&mut self, machine: StateMachine) -> Result<(), WarehouseError> {
-       self.state_machines.insert(machine.id().clone(), machine);
+        self.state_machines.insert(machine.id().clone(), machine);
         Ok(())
     }
 }

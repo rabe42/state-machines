@@ -1,5 +1,5 @@
 use crate::error::StateChartError;
-use open_api_matcher::{Value, ValidatedValue};
+use open_api_matcher::{ValidatedValue, Value};
 use regex::Regex;
 use uuid::Uuid;
 
@@ -68,7 +68,7 @@ impl From<NodeId> for String {
     }
 }
 
-impl <'a>From<&'a NodeId> for &'a String {
+impl<'a> From<&'a NodeId> for &'a String {
     fn from(value: &'a NodeId) -> &'a String {
         let NodeId(content) = value;
         content

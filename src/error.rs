@@ -1,7 +1,7 @@
 use crate::ids::{NodeId, StateId};
-use open_api_matcher::{Value, OpenApiValidationError};
-use thiserror::Error;
+use open_api_matcher::{OpenApiValidationError, Value};
 use std::collections::BTreeMap;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum StateChartError {
