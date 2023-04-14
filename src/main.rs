@@ -4,6 +4,7 @@ mod state_charts;
 mod state_machine;
 mod state_machine_log;
 mod warehouse;
+mod sql;
 
 use env_logger;
 use hyper::Method;
@@ -11,22 +12,48 @@ use log::{debug, error, info};
 use open_api_matcher::{OpenApiResponse, Value, RequestParamters, OpenApiOperation};
 use std::fs::File;
 use std::net::SocketAddr;
+use r2d2::{ManageConnection, Pool};
+use r2d2_sqlite::SqliteConnectionManager;
 
 use crate::state_charts::Node;
 use crate::error::StateChartError;
+
+// TODO: Create a database for managing the state state_charts
+// TODO: Create a database for managing the state machines
+// TODO: Store a state chart in the database
+// TODO: Store a state machine in the database.
 
 #[tokio::main]
 pub async fn main() {
     env_logger::init();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let file = File::open("StateMachine.yml").unwrap();
+    let file = File::open("StateMachines.yml").unwrap();
+    let pool = create_db_connection();
+    init_data_modell(pool.clone());
     info!("Starting server on {:?}!", addr);
-    open_api_matcher::service::start(addr, &file, Box::new(handle)).await;
+    open_api_matcher::service::start(addr, &file, Box::new(handle), pool).await;
+}
+
+/// Creates and initialize the database connection pool.
+fn create_db_connection() -> Pool<SqliteConnectionManager>
+{
+    let manager = r2d2_sqlite::SqliteConnectionManager::memory();
+    let pool = Pool::builder()
+        .max_size(10)
+        .build(manager)
+        .unwrap();
+    pool
+}
+
+fn init_data_modell<B: ManageConnection>(pool: Pool<B>)
+{
+    let connection = pool.get().unwrap();
+    // FIXME: Here we have to call the create() method of the different entities.
 }
 
 /// The central function, where all request must be handled.
-async fn handle(request: open_api_matcher::service::RequestMatch) -> OpenApiResponse {
+async fn handle<M: ManageConnection>(request: open_api_matcher::service::RequestMatch, _ctx: Pool<M>) -> OpenApiResponse {
     match request.into_match() {
         (&Method::GET, "/state-chart/", _p, op) => {
             let mut response = OpenApiResponse::new(op);
