@@ -1,4 +1,20 @@
 use r2d2::{ManageConnection, PooledConnection};
+use rusqlite::{ToSql, types::ToSqlOutput};
+
+enum KeyValue {
+    Integer(i64),
+    String(String),
+}
+impl ToSql for KeyValue {
+
+    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error>
+    {
+        match self {
+            Self::Integer(i) => i.to_sql(),
+            Self::String(s) => s.to_sql(),
+        }
+    }
+}
 
 /// The trait provides an interface to the naive database operations. It supports different
 /// databases in one codes byse by a type parameter.
@@ -10,7 +26,7 @@ pub trait Crud<B: ManageConnection> {
     fn insert(&mut self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
     fn update(&self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
     fn delete(&self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
-    fn select(connection: &PooledConnection<B>, key: i64) -> Result<Option<Self>, Self::Error>
+    fn select(connection: &PooledConnection<B>, key_value: KeyValue) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized;
 }
@@ -96,14 +112,15 @@ mod tests {
 
         fn select(
             connection: &PooledConnection<SqliteConnectionManager>,
-            key: i64,
+            key_value: KeyValue,
         ) -> Result<Option<Self>, Self::Error>
         where
             Self: Sized,
         {
             let sql = "SELECT rowid, attribute_1, attribute_2 FROM Entity WHERE rowid = ?";
             let mut statement = connection.prepare(sql)?;
-            let mut entities = statement.query_map(params![key], |row| {
+
+            let mut entities = statement.query_map(params![key_value], |row| {
                 let id = row.get(0)?;
                 let attribute_1 = row.get(1)?;
                 let attribute_2 = row.get(2)?;
@@ -138,25 +155,25 @@ mod tests {
         entity1.insert(&connection).unwrap();
         let mut entity2 = Entity::new("World", 1000000003);
         entity2.insert(&connection).unwrap();
-        let selected_e1 = Entity::select(&connection, entity1.id.unwrap())
+        let selected_e1 = Entity::select(&connection, KeyValue::Integer(entity1.id.unwrap()))
             .unwrap()
             .unwrap();
         assert_eq!(entity1.attribute_1, selected_e1.attribute_1);
         assert_eq!(entity1.attribute_2, selected_e1.attribute_2);
-        let selected_e2 = Entity::select(&connection, entity2.id.unwrap())
+        let selected_e2 = Entity::select(&connection, KeyValue::Integer(entity2.id.unwrap()))
             .unwrap()
             .unwrap();
         assert_eq!(entity2.attribute_1, selected_e2.attribute_1);
         assert_eq!(entity2.attribute_2, selected_e2.attribute_2);
         entity1.attribute_2 = 4;
         entity1.update(&connection).unwrap();
-        let selected_e1 = Entity::select(&connection, entity1.id.unwrap())
+        let selected_e1 = Entity::select(&connection, KeyValue::Integer(entity1.id.unwrap()))
             .unwrap()
             .unwrap();
         assert_eq!(entity1.attribute_1, selected_e1.attribute_1);
         assert_eq!(entity1.attribute_2, selected_e1.attribute_2);
         entity1.delete(&connection).unwrap();
-        if let Some(_) = Entity::select(&connection, entity1.id.unwrap()).unwrap() {
+        if let Some(_) = Entity::select(&connection, KeyValue::Integer(entity1.id.unwrap())).unwrap() {
             panic!("Deleted entity shouldn't be found.");
         }
     }
