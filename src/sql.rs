@@ -1,7 +1,7 @@
 use r2d2::{ManageConnection, PooledConnection};
 use rusqlite::{ToSql, types::ToSqlOutput};
 
-enum KeyValue {
+pub enum KeyValue {
     Integer(i64),
     String(String),
 }

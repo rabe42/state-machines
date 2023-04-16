@@ -1,6 +1,9 @@
 use crate::error::StateChartError;
 use crate::ids::NodeId;
+use crate::sql::{Crud, KeyValue};
 use open_api_matcher::ValidatedValue;
+use r2d2::PooledConnection;
+use r2d2_sqlite::SqliteConnectionManager;
 use std::collections::BTreeMap;
 
 /// A system wide unique Id of a action.
@@ -17,6 +20,8 @@ pub type PredicateId = String;
 
 /// The node is the heart of the state chart definition. A node can be a single state or a state
 /// chart of its own.
+/// The node will be saved in all details to the database. The objective is to make it easier to
+/// address the nodes in the context of the state machines operations.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Node {
@@ -37,6 +42,52 @@ impl Node {
     /// Provides access to the optional start node of the state chart.
     pub fn start_node(&self) -> Option<&NodeId> {
         self.start_node.as_ref()
+    }
+}
+impl Crud<SqliteConnectionManager> for Node {
+    type Error = rusqlite::Error;
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS Node (
+                id TEXT NOT NULL UNIQUE,
+                description TEXT,
+                on_entry TEXT,
+                on_exit TEXT,
+                start_node TEXT,
+                out_transitions TEXT,
+                attributes TEXT,
+                nodes TEXT
+            )";
+        connection.execute(sql, [])?;
+        let sql = "CREATE TABLE IF NOT EXISTS NodeAttributes (
+                node_id TEXT NOT NULL,
+                attribute_id TEXT NOT NULL,
+            )";
+        connection.execute(sql, [])?;
+        let sql = "CREATE TABLE IF NOT EXISTS SubNodes (
+                parent_node TEXT NOT NULL,
+                child_node TEXT NOT NULL
+            )";
+        connection.execute(sql, [])?;
+        Ok(())
+    }
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(connection: &PooledConnection<SqliteConnectionManager>, key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
     }
 }
 /// Constructs a node from the validated value.
@@ -351,6 +402,7 @@ fn parameters_from_validated_values(
 mod tests {
     use super::*;
     use open_api_matcher::OpenApi;
+    use r2d2::Pool;
 
     #[test]
     fn test_get_mandatory() {
@@ -443,5 +495,18 @@ mod tests {
         assert_eq!(NodeId::new("Simple-Task"), node.id);
         assert_eq!(NodeId::new("Simple-Task/New"), node.start_node.unwrap());
         assert_eq!(3, node.nodes.len());
+    }
+
+    fn create_db_connection() -> Pool<SqliteConnectionManager> {
+        let manager = r2d2_sqlite::SqliteConnectionManager::memory();
+        let pool = Pool::builder().max_size(10).build(manager).unwrap();
+        pool
+    }
+
+    #[test]
+    fn test_node_crud() {
+        let pool = create_db_connection();
+        let connection = pool.get().unwrap();
+        Node::create(&connection).unwrap();
     }
 }
