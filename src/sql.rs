@@ -23,7 +23,7 @@ impl ToSql for KeyValue {
 pub trait Crud<B: ManageConnection> {
     type Error;
     fn create(connection: &PooledConnection<B>) -> Result<(), Self::Error>;
-    fn insert(&mut self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
+    fn insert(&mut self, connection: &PooledConnection<B>) -> Result<KeyValue, Self::Error>;
     fn update(&self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
     fn delete(&self, connection: &PooledConnection<B>) -> Result<(), Self::Error>;
     fn select(connection: &PooledConnection<B>, key_value: KeyValue) -> Result<Option<Self>, Self::Error>
@@ -68,14 +68,15 @@ mod tests {
         fn insert(
             &mut self,
             connection: &PooledConnection<SqliteConnectionManager>,
-        ) -> Result<(), Self::Error> {
+        ) -> Result<KeyValue, Self::Error> {
             if let Some(_) = self.id {
                 panic!("Cannot insert the same entity twice!");
             } else {
                 let sql = "INSERT INTO Entity ( attribute_1, attribute_2 ) VALUES ( ?, ? )";
                 let mut statement = connection.prepare(sql)?;
-                self.id = Some(statement.insert(params![self.attribute_1, self.attribute_2])?);
-                Ok(())
+                let rowid = statement.insert(params![self.attribute_1, self.attribute_2])?;
+                self.id = Some(rowid);
+                Ok(KeyValue::Integer(rowid))
             }
         }
 

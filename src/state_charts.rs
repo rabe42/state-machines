@@ -4,6 +4,7 @@ use crate::sql::{Crud, KeyValue};
 use open_api_matcher::ValidatedValue;
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use std::collections::BTreeMap;
 
 /// A system wide unique Id of a action.
@@ -17,129 +18,6 @@ pub type EventId = String;
 
 /// A system wide unique Id of a predicate.
 pub type PredicateId = String;
-
-/// The node is the heart of the state chart definition. A node can be a single state or a state
-/// chart of its own.
-/// The node will be saved in all details to the database. The objective is to make it easier to
-/// address the nodes in the context of the state machines operations.
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub struct Node {
-    id: NodeId,
-    description: Option<String>,
-    on_entry: Option<ActionCall>,
-    on_exit: Option<ActionCall>,
-    start_node: Option<NodeId>,
-    out_transitions: Vec<Transition>,
-    attributes: Vec<VariableDeclaration>,
-    nodes: Vec<Node>,
-}
-impl Node {
-    pub fn id(&self) -> &NodeId {
-        &self.id
-    }
-
-    /// Provides access to the optional start node of the state chart.
-    pub fn start_node(&self) -> Option<&NodeId> {
-        self.start_node.as_ref()
-    }
-}
-impl Crud<SqliteConnectionManager> for Node {
-    type Error = rusqlite::Error;
-    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
-    {
-        let sql = "CREATE TABLE IF NOT EXISTS Node (
-                id TEXT NOT NULL UNIQUE,
-                description TEXT,
-                on_entry TEXT,
-                on_exit TEXT,
-                start_node TEXT,
-                out_transitions TEXT,
-                attributes TEXT,
-                nodes TEXT
-            )";
-        connection.execute(sql, [])?;
-        let sql = "CREATE TABLE IF NOT EXISTS NodeAttributes (
-                node_id TEXT NOT NULL,
-                attribute_id TEXT NOT NULL,
-            )";
-        connection.execute(sql, [])?;
-        let sql = "CREATE TABLE IF NOT EXISTS SubNodes (
-                parent_node TEXT NOT NULL,
-                child_node TEXT NOT NULL
-            )";
-        connection.execute(sql, [])?;
-        Ok(())
-    }
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
-    {
-        todo!()
-    }
-    fn update(&self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
-    {
-        todo!()
-    }
-    fn delete(&self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
-    {
-        todo!()
-    }
-    fn select(connection: &PooledConnection<SqliteConnectionManager>, key_value: KeyValue) -> Result<Option<Self>, Self::Error>
-    where
-        Self: Sized
-    {
-        todo!()
-    }
-}
-/// Constructs a node from the validated value.
-impl TryFrom<&ValidatedValue> for Node {
-    type Error = StateChartError;
-
-    fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
-        if let ValidatedValue::Object(attributes) = value {
-            let on_entry = match attributes.get("on-entry") {
-                Some(vac) => {
-                    let ac: ActionCall = vac.try_into()?;
-                    Some(ac)
-                }
-                None => None,
-            };
-            let on_exit = match attributes.get("on-exit") {
-                Some(vac) => {
-                    let ac: ActionCall = vac.try_into()?;
-                    Some(ac)
-                }
-                None => None,
-            };
-            let description = match attributes.get("description") {
-                Some(vd) => {
-                    let d: String = vd.try_into()?;
-                    Some(d)
-                }
-                None => None,
-            };
-            let start_node: Option<NodeId> = match attributes.get("start-node") {
-                Some(sn) => Some(sn.try_into()?),
-                None => None,
-            };
-            let out_transitions = match attributes.get("out-transitions") {
-                Some(ot) => transitions_from_validated_value(ot)?,
-                None => Vec::new(),
-            };
-            Ok(Node {
-                id: get_mandatory(&attributes, "id")?.try_into()?,
-                description,
-                on_entry,
-                on_exit,
-                start_node,
-                out_transitions,
-                attributes: attributes_from_validated_value(attributes.get("attributes"))?,
-                nodes: nodes_from_validated_value(attributes.get("nodes"))?,
-            })
-        } else {
-            Err(StateChartError::UnexpectedType)
-        }
-    }
-}
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -163,6 +41,48 @@ impl TryFrom<&ValidatedValue> for ActionCall {
     }
 }
 
+/// The action call buys in on the implicid rowid, provided by SQLite.
+/// While the action call is basically the name of the action and the list of parameters. The same
+/// name and set of parameters can be used multiple times. In the relational world, this requires
+/// an additional object id of the action call relation/object.
+impl Crud<SqliteConnectionManager> for ActionCall {
+    type Error = rusqlite::Error;
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS ActionCall (
+                name TEXT NOT NULL
+            )";
+        connection.execute(sql, [])?;
+        let sql = "CREATE TABLE IF NOT EXISTS ACParameterList (
+                action_call_id INTEGER NOT NULL,
+                parameter_name TEXT,
+                parameter_value TEXT,
+                FOREIGN KEY(action_call_id) REFERENCES ActionCall(rowid)
+            )";
+        connection.execute(sql, [])?;
+
+        Ok(())
+    }
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Parameter {
@@ -180,6 +100,57 @@ impl TryFrom<&ValidatedValue> for Parameter {
         } else {
             Err(StateChartError::UnexpectedType)
         }
+    }
+}
+
+impl Crud<SqliteConnectionManager> for Parameter {
+    type Error = rusqlite::Error;
+
+    /// Crates the tables, needed to store a parameter of a action call or a predicate.
+    /// To simulate the enumeration behaviour the value type must be stored with it.
+    /// It *MUST* have the value "string", "integer", "bool", "number", "none".
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS Parameter (
+                name TEXT NOT NULL,
+                value_type TEXT NOT NULL,
+                string_value TEXT,
+                integer_value INTEGER,
+                boolean_value INTEGER,
+                number_value REAL
+            )";
+        connection.execute(sql, [])?;
+        Ok(())
+    }
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        let value_column = match &self.value {
+            VariableValue::String(_) => "string_value",
+            VariableValue::Integer(_) => "integer_value",
+            VariableValue::Number(_) => "number",
+            VariableValue::Boolean(_) => "bool",
+            VariableValue::None => "none",
+        };
+        let sql = format!("INSERT INTO (name, value_type, {value_column}) 
+            VALUES (?, ?, ?)");
+        let mut statement = connection.prepare(&sql)?;
+        let rowid = statement.insert(params![self.name, ])?; // FIXME: I have to put the remaining
+                                                             // parameters here!
+        Ok(KeyValue::Integer(rowid))
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
     }
 }
 
@@ -215,6 +186,47 @@ impl TryFrom<&ValidatedValue> for Transition {
     }
 }
 
+impl Crud<SqliteConnectionManager> for Transition {
+    type Error = rusqlite::Error;
+
+    /// Crates the tables, needed to store a parameter of a action call or a predicate.
+    /// To simulate the enumeration behaviour the value type must be stored with it.
+    /// It *MUST* have the value "string", "integer", "bool", "number", "none".
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS Transition (
+                guard INTEGER NOT NULL,
+                target TEXT NOT NULL,
+                action INTEGER
+            )";
+        connection.execute(sql, [])?;
+
+        Guard::create(connection)?;
+        ActionCall::create(connection)?;
+
+        Ok(())
+    }
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
+    }
+}
+
+
 /// The guard on a trasition holds the condition under which a transaction is activated.
 /// It will be evaluated by the state machine runtime.
 #[allow(dead_code)]
@@ -239,6 +251,46 @@ impl TryFrom<&ValidatedValue> for Guard {
     }
 }
 
+impl Crud<SqliteConnectionManager> for Guard {
+    type Error = rusqlite::Error;
+
+    /// Crates the tables, needed to store a parameter of a action call or a predicate.
+    /// To simulate the enumeration behaviour the value type must be stored with it.
+    /// It *MUST* have the value "string", "integer", "bool", "number", "none".
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS Guard (
+                guard_type TEXT NOT NULL,
+                event TEXT,
+                predicate_call INTEGER
+            )";
+        connection.execute(sql, [])?;
+
+        PredicateCall::create(connection)?;
+
+        Ok(())
+    }
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
+    }
+}
+
+
 /// The call of a predicate may be a guard. The predicate of all transactions of the current state
 /// will be evaluated when ever a variable value was modified.
 #[allow(dead_code)]
@@ -262,6 +314,46 @@ impl TryFrom<&ValidatedValue> for PredicateCall {
     }
 }
 
+impl Crud<SqliteConnectionManager> for PredicateCall {
+    type Error = rusqlite::Error;
+
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS PredicateCall (
+                name TEXT NOT NULL,
+                parameter_list INTEGER
+            )";
+        connection.execute(sql, [])?;
+        let sql = "CREATE TABLE IF NOT EXISTS PredicateCallParameterList (
+                predicate_call_id INTEGER NOT NULL,
+                parameter_id INTEGER NOT NULL
+            )";
+        connection.execute(sql, [])?;
+
+        Parameter::create(connection)?;
+
+        Ok(())
+    }
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
+    }
+}
+
 /// Declares a variable inside of a state chart state.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -269,6 +361,15 @@ pub struct VariableDeclaration {
     name: String,
     r#type: String,
     value: VariableValue,
+}
+impl VariableDeclaration {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn value(&self) -> &VariableValue {
+        &self.value
+    }
 }
 impl TryFrom<&ValidatedValue> for VariableDeclaration {
     type Error = StateChartError;
@@ -283,6 +384,46 @@ impl TryFrom<&ValidatedValue> for VariableDeclaration {
         } else {
             Err(StateChartError::UnexpectedType)
         }
+    }
+}
+
+impl Crud<SqliteConnectionManager> for VariableDeclaration {
+    type Error = rusqlite::Error;
+
+    /// Crates the tables, needed to store a parameter of a action call or a predicate.
+    /// To simulate the enumeration behaviour the value type must be stored with it.
+    /// It *MUST* have the value "string", "integer", "bool", "number", "none".
+    fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        let sql = "CREATE TABLE IF NOT EXISTS VariableDeclaration (
+                name TEXT NOT NULL,
+                variable_type TEXT NOT NULL,
+                string_value TEXT,
+                integer_value INTEGER,
+                number_value REAL,
+                bool_value INTEGER
+            )";
+        connection.execute(sql, [])?;
+
+        Ok(())
+    }
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    {
+        todo!()
+    }
+    fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn delete(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
+    {
+        todo!()
+    }
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    where
+        Self: Sized
+    {
+        todo!()
     }
 }
 
@@ -315,72 +456,6 @@ impl TryFrom<&ValidatedValue> for VariableValue {
     }
 }
 
-/// Retrieves a mandatory attribute from a standard map.
-fn get_mandatory<'a>(
-    attributes: &'a BTreeMap<String, ValidatedValue>,
-    name: &str,
-) -> Result<&'a ValidatedValue, StateChartError> {
-    if let Some(attribute) = attributes.get(name) {
-        Ok(attribute)
-    } else {
-        Err(StateChartError::MandatoryAttributeMissing(name.into()))
-    }
-}
-
-/// Retrieves the transitions of a node from the transition.
-fn transitions_from_validated_value(
-    value: &ValidatedValue,
-) -> Result<Vec<Transition>, StateChartError> {
-    if let ValidatedValue::Array(transitions) = value {
-        let mut result = Vec::new();
-        for v_transition in transitions {
-            let transition = v_transition.try_into()?;
-            result.push(transition)
-        }
-        Ok(result)
-    } else {
-        Err(StateChartError::UnexpectedType)
-    }
-}
-
-/// Retrieves the attributes/variables from the array.
-fn attributes_from_validated_value(
-    value: Option<&ValidatedValue>,
-) -> Result<Vec<VariableDeclaration>, StateChartError> {
-    if let Some(value) = value {
-        if let ValidatedValue::Array(attribs) = value {
-            let mut result: Vec<VariableDeclaration> = Vec::new();
-            for attribute in attribs {
-                let vd: VariableDeclaration = attribute.try_into()?;
-                result.push(vd);
-            }
-            Ok(result)
-        } else {
-            Err(StateChartError::UnexpectedType)
-        }
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn nodes_from_validated_value(
-    value: Option<&ValidatedValue>,
-) -> Result<Vec<Node>, StateChartError> {
-    if let Some(v_value) = value {
-        if let ValidatedValue::Array(nodes) = v_value {
-            let mut result: Vec<Node> = Vec::new();
-            for v_node in nodes {
-                let node = v_node.try_into()?;
-                result.push(node);
-            }
-            Ok(result)
-        } else {
-            Err(StateChartError::UnexpectedType)
-        }
-    } else {
-        Ok(Vec::new())
-    }
-}
 
 /// Derives a vector of parameters from an array of validated values.
 fn parameters_from_validated_values(
@@ -398,10 +473,22 @@ fn parameters_from_validated_values(
     }
 }
 
+/// Retrieves a mandatory attribute from a standard map.
+pub fn get_mandatory<'a>(
+    attributes: &'a BTreeMap<String, ValidatedValue>,
+    name: &str,
+) -> Result<&'a ValidatedValue, StateChartError> {
+    if let Some(attribute) = attributes.get(name) {
+        Ok(attribute)
+    } else {
+        Err(StateChartError::MandatoryAttributeMissing(name.into()))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use open_api_matcher::OpenApi;
     use r2d2::Pool;
 
     #[test]
@@ -461,52 +548,33 @@ mod tests {
         let _vd: VariableDeclaration = (&vd1).try_into().unwrap();
     }
 
-    #[test]
-    fn test_attributes_from_vv() {
-        // Create a list of ValidatedValues with objects with the attributes of the
-        // VariableDeclaration
-        let mut vd1_bt: BTreeMap<String, ValidatedValue> = BTreeMap::new();
-        vd1_bt.insert("name".into(), ValidatedValue::String("var1".into()));
-        vd1_bt.insert("type".into(), ValidatedValue::String("integer".into()));
-        vd1_bt.insert("value".into(), ValidatedValue::Integer(1));
-        let vd1 = ValidatedValue::Object(vd1_bt);
-        let mut vd2_bt: BTreeMap<String, ValidatedValue> = BTreeMap::new();
-        vd2_bt.insert("name".into(), ValidatedValue::String("var2".into()));
-        vd2_bt.insert("type".into(), ValidatedValue::String("boolean".into()));
-        vd2_bt.insert("value".into(), ValidatedValue::Bool(true));
-        let vd2 = ValidatedValue::Object(vd2_bt);
-
-        let v = vec![vd1, vd2];
-        let attributes = attributes_from_validated_value(Some(&ValidatedValue::Array(v))).unwrap();
-        assert_eq!(attributes.len(), 2);
-        assert_eq!(attributes[0].name, "var1");
-        assert_eq!(attributes[0].value, VariableValue::Integer(1));
-        // let _vd1 = VariableDeclaration::new("var1", "integer", VariableValue::Integer(1));
-    }
-
-    #[test]
-    fn test_read_sc() {
-        let open_api_file = std::fs::File::open("StateMachines.yml").unwrap();
-        let open_api = OpenApi::new(&open_api_file).unwrap();
-        let sc = std::fs::read_to_string("tests/simple-task.json").unwrap();
-        let sc_schema = open_api.get_schema("#/components/schemas/Node").unwrap();
-        let vvsc = ValidatedValue::new(&sc, &sc_schema, &open_api).unwrap();
-        let node: Node = (&vvsc).try_into().unwrap();
-        assert_eq!(NodeId::new("Simple-Task"), node.id);
-        assert_eq!(NodeId::new("Simple-Task/New"), node.start_node.unwrap());
-        assert_eq!(3, node.nodes.len());
-    }
-
-    fn create_db_connection() -> Pool<SqliteConnectionManager> {
+    fn create_db_connection() -> PooledConnection<SqliteConnectionManager> {
         let manager = r2d2_sqlite::SqliteConnectionManager::memory();
         let pool = Pool::builder().max_size(10).build(manager).unwrap();
-        pool
+        pool.get().unwrap()
     }
 
     #[test]
-    fn test_node_crud() {
-        let pool = create_db_connection();
-        let connection = pool.get().unwrap();
-        Node::create(&connection).unwrap();
+    fn test_parametert_crud() {
+        let connection = create_db_connection();
+        Parameter::create(&connection).unwrap();
+    }
+
+    #[test]
+    fn test_predicate_call_crud() {
+        let connection = create_db_connection();
+        PredicateCall::create(&connection).unwrap();
+    }
+
+    #[test]
+    fn test_action_call_crud() {
+        let connection = create_db_connection();
+        ActionCall::create(&connection).unwrap();
+    }
+
+    #[test]
+    fn test_variable_declaration_crud() {
+        let connection = create_db_connection();
+        VariableDeclaration::create(&connection).unwrap();
     }
 }

@@ -1,6 +1,6 @@
 use crate::error::StateChartError;
 use crate::ids::StateId;
-use crate::state_charts::Node;
+use crate::node::Node;
 
 /// A state machine is a running state chart.
 pub struct StateMachine {

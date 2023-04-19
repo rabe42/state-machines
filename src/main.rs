@@ -1,10 +1,10 @@
 mod error;
+mod node;
 mod ids;
 mod sql;
 mod state_charts;
 mod state_machine;
 mod state_machine_log;
-mod warehouse;
 
 use env_logger;
 use hyper::Method;
@@ -16,9 +16,9 @@ use std::fs::File;
 use std::net::SocketAddr;
 
 use crate::error::StateChartError;
-use crate::state_charts::Node;
+use crate::sql::Crud;
+use crate::node::Node;
 
-// TODO: Create a database for managing the state state_charts
 // TODO: Create a database for managing the state machines
 // TODO: Store a state chart in the database
 // TODO: Store a state machine in the database.
@@ -42,8 +42,9 @@ fn create_db_connection() -> Pool<SqliteConnectionManager> {
     pool
 }
 
-fn init_data_modell<B: ManageConnection>(pool: Pool<B>) {
+fn init_data_modell(pool: Pool<SqliteConnectionManager>) {
     let connection = pool.get().unwrap();
+    Node::create(&connection).unwrap();
     // FIXME: Here we have to call the create() method of the different entities.
 }
 
@@ -111,7 +112,7 @@ async fn create_state_chart(p: &RequestParamters, op: &OpenApiOperation) -> Open
     response
 }
 
-async fn start_state_machine(p: &RequestParamters, op: &OpenApiOperation) -> OpenApiResponse {
+async fn start_state_machine(_p: &RequestParamters, op: &OpenApiOperation) -> OpenApiResponse {
     let response = OpenApiResponse::new(op);
     response
 }
