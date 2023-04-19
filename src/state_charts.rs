@@ -122,6 +122,10 @@ impl Crud<SqliteConnectionManager> for Parameter {
         connection.execute(sql, [])?;
         Ok(())
     }
+
+    /// Inserts the value of the variable in a different column, depending on the value type.
+    /// If the value type is none, a string value is assumed. This is realized by the get_column_name()
+    /// and get_type() methods of the VariableValue.
     fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
     {
         let value_column = self.value.get_column_name();
@@ -442,7 +446,7 @@ impl VariableValue {
             Self::Integer(_) => "integer_value",
             Self::Number(_) => "number_value",
             Self::Boolean(_) => "boolean_value",
-            Self::None => ""
+            Self::None => "string_value",
         }
     }
 
@@ -452,7 +456,7 @@ impl VariableValue {
             Self::Integer(_) => "integer",
             Self::Number(_) => "number",
             Self::Boolean(_) => "boolean",
-            Self::None => "none",
+            Self::None => "string",
         }
     }
 
