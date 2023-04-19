@@ -124,17 +124,10 @@ impl Crud<SqliteConnectionManager> for Parameter {
     }
     fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
     {
-        let value_column = match &self.value {
-            VariableValue::String(_) => "string_value",
-            VariableValue::Integer(_) => "integer_value",
-            VariableValue::Number(_) => "number",
-            VariableValue::Boolean(_) => "bool",
-            VariableValue::None => "none",
-        };
-        let sql = format!("INSERT INTO (name, value_type, {value_column}) 
-            VALUES (?, ?, ?)");
+        let value_column = self.value.get_column_name();
+        let sql = format!("INSERT INTO Parameter (name, value_type, {value_column}) VALUES (?, ?, ?)");
         let mut statement = connection.prepare(&sql)?;
-        let rowid = statement.insert(params![self.name, ])?; // FIXME: I have to put the remaining
+        let rowid = statement.insert(params![self.name, self.value.get_type(), self.value.to_string() ])?;
                                                              // parameters here!
         Ok(KeyValue::Integer(rowid))
     }
@@ -146,10 +139,13 @@ impl Crud<SqliteConnectionManager> for Parameter {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
+        let sql = "SELECT name, value_type; string_value, integer_value, boolean_value, number_value
+                   FROM Parameter WHERE rowid=?";
+        let _statement = connection.prepare(sql)?;
         todo!()
     }
 }
@@ -436,6 +432,40 @@ pub enum VariableValue {
     Boolean(bool),
     None,
 }
+impl VariableValue {
+
+    /// Provides access to the type of the variable value, which is intended to be used as the
+    /// column of the value in the database.
+    fn get_column_name(&self) -> &'static str {
+        match self {
+            Self::String(_) => "string_value",
+            Self::Integer(_) => "integer_value",
+            Self::Number(_) => "number_value",
+            Self::Boolean(_) => "boolean_value",
+            Self::None => ""
+        }
+    }
+
+    fn get_type(&self) -> &'static str {
+        match self {
+            Self::String(_) => "string",
+            Self::Integer(_) => "integer",
+            Self::Number(_) => "number",
+            Self::Boolean(_) => "boolean",
+            Self::None => "none",
+        }
+    }
+
+    fn to_string(&self) -> String {
+        match self {
+            Self::String(s) => s.clone(),
+            Self::Integer(i) => format!("{}", i),
+            Self::Number(n) => format!("{}", n),
+            Self::Boolean(b) => if *b { String::from("1") } else { String::from("0") },
+            Self::None => String::from(""),
+        }
+    }
+}
 impl Default for VariableValue {
     fn default() -> Self {
         Self::None
@@ -558,6 +588,10 @@ mod tests {
     fn test_parametert_crud() {
         let connection = create_db_connection();
         Parameter::create(&connection).unwrap();
+        let mut p1 = Parameter { name: "p2".into(), value: VariableValue::String("a string".into()) };
+        p1.insert(&connection).unwrap();
+        // let mut p2 = Parameter { name: "p1".into(), value: VariableValue::None };
+        // p2.insert(&connection).unwrap();
     }
 
     #[test]
