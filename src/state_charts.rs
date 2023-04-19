@@ -588,10 +588,16 @@ mod tests {
     fn test_parametert_crud() {
         let connection = create_db_connection();
         Parameter::create(&connection).unwrap();
-        let mut p1 = Parameter { name: "p2".into(), value: VariableValue::String("a string".into()) };
+        let mut p1 = Parameter { name: "p1".into(), value: VariableValue::String("a string".into()) };
         p1.insert(&connection).unwrap();
-        // let mut p2 = Parameter { name: "p1".into(), value: VariableValue::None };
-        // p2.insert(&connection).unwrap();
+        let mut p2 = Parameter { name: "p2".into(), value: VariableValue::Integer(3623456) };
+        p2.insert(&connection).unwrap();
+        let mut p3 = Parameter { name: "p3".into(), value: VariableValue::Number(3623456.123456) };
+        p3.insert(&connection).unwrap();
+        let mut p4 = Parameter { name: "p4".into(), value: VariableValue::Boolean(true) };
+        p4.insert(&connection).unwrap();
+        let mut p5 = Parameter { name: "p5".into(), value: VariableValue::None };
+        p5.insert(&connection).unwrap();
     }
 
     #[test]
