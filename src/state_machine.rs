@@ -3,6 +3,7 @@ use crate::ids::StateId;
 use crate::node::Node;
 
 /// A state machine is a running state chart.
+#[allow(dead_code)]
 pub struct StateMachine {
     /// This is the id of the root state. Constructed from an unique name of the machine and the id
     /// of the state chart.
@@ -12,6 +13,7 @@ pub struct StateMachine {
     /// This is the id of the current state.
     current_state: StateId,
 }
+#[allow(dead_code)]
 impl StateMachine {
     /// Creates a new state machine, based on the provided state chart.
     pub fn new(state_chart: Node) -> Result<StateMachine, StateChartError> {
