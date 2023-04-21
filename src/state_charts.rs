@@ -168,8 +168,6 @@ impl Crud<SqliteConnectionManager> for Parameter {
     {
         let sql = "SELECT name, value_type, string_value, integer_value, number_value, boolean_value
                    FROM Parameter WHERE rowid=?";
-        // let _sql = "SELECT name, value_type ,
-        //     FROM Parameter WHERE rowid=?";
         let mut statement = connection.prepare(sql)?;
         let mut rows = statement.query([key_value])?;
         if let Some(row) = rows.next()? {
