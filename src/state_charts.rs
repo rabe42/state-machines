@@ -166,8 +166,10 @@ impl Crud<SqliteConnectionManager> for Parameter {
     where
         Self: Sized
     {
-        let sql = "SELECT name, value_type; string_value, integer_value, number_value, boolean_value
+        let sql = "SELECT name, value_type, string_value, integer_value, number_value, boolean_value
                    FROM Parameter WHERE rowid=?";
+        // let _sql = "SELECT name, value_type ,
+        //     FROM Parameter WHERE rowid=?";
         let mut statement = connection.prepare(sql)?;
         let mut rows = statement.query([key_value])?;
         if let Some(row) = rows.next()? {
@@ -648,15 +650,10 @@ mod tests {
         let mut p5 = Parameter { name: "p5".into(), value: VariableValue::None };
         p5.insert(&connection).unwrap();
 
-        if let Err(err) = Parameter::select(&connection, oid_p1) {
-            let es = format!("{}", err);
-            println!("{}", es)
-        }
-
-        // let r_p1 = Parameter::select(&connection, oid_p1).unwrap().unwrap();
-        // assert_eq!(r_p1.name, p1.name);
-        // assert_eq!(r_p1.value, p1.value);
-        // FIXME: Check, if we can retrieve also.
+        // Checking on retrieval.
+        let r_p1 = Parameter::select(&connection, oid_p1).unwrap().unwrap();
+        assert_eq!(r_p1.name, p1.name);
+        assert_eq!(r_p1.value, p1.value);
     }
 
     #[test]
