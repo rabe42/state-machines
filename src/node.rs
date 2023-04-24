@@ -5,7 +5,7 @@ use rusqlite::params;
 use log::debug;
 
 use crate::error::StateChartError;
-use crate::sql::{Crud, KeyValue};
+use crate::sql::Crud;
 use crate::ids::NodeId;
 use crate::state_charts::{ActionCall, Transition, VariableDeclaration, get_mandatory};
 
@@ -36,8 +36,18 @@ impl Node {
         self.start_node.as_ref()
     }
 }
-impl Crud<SqliteConnectionManager> for Node {
+impl Crud<SqliteConnectionManager, NodeId> for Node {
     type Error = rusqlite::Error;
+
+    /// This id differs from the id of the other CRUD objects. While the id is normally provided
+    /// only by the database, this id is provided by the user and already available from the start,
+    /// which means, it is not optional at all. This implies some dificulties in providing a
+    /// reference, linked to the lifetime of the receiver.
+    fn get_id(&self) -> Option<&NodeId>
+    {
+        Some(&self.id)
+    }
+
     fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
         debug!("[node::Crud::create()]");
@@ -69,7 +79,7 @@ impl Crud<SqliteConnectionManager> for Node {
 
         Ok(())
     }
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<&NodeId, Self::Error>
     {
         debug!("[node::Crud::insert()]");
         let sql = "INSERT INTO Node (
@@ -79,7 +89,7 @@ impl Crud<SqliteConnectionManager> for Node {
                 )";
         let mut statement = connection.prepare(sql)?;
         let _rowid = statement.insert(params![]);
-        Ok(KeyValue::String(self.id.clone().into()))
+        Ok(&self.id)
     }
     fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
@@ -91,7 +101,7 @@ impl Crud<SqliteConnectionManager> for Node {
         debug!("[node::Crud::delete()]");
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &NodeId) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {

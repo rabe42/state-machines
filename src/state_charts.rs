@@ -1,6 +1,6 @@
 use crate::error::StateChartError;
 use crate::ids::NodeId;
-use crate::sql::{Crud, KeyValue};
+use crate::sql::Crud;
 use open_api_matcher::ValidatedValue;
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -22,6 +22,7 @@ pub type PredicateId = String;
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ActionCall {
+    id: Option<i64>,
     name: ActionId,
     parameters: Vec<Parameter>,
 }
@@ -34,7 +35,7 @@ impl TryFrom<&ValidatedValue> for ActionCall {
             let name: ActionId = get_mandatory(attributes, "name")?.try_into()?;
             let parameters: Vec<Parameter> =
                 parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
-            Ok(ActionCall { name, parameters })
+            Ok(ActionCall { id: None, name, parameters })
         } else {
             Err(StateChartError::UnexpectedType)
         }
@@ -45,8 +46,14 @@ impl TryFrom<&ValidatedValue> for ActionCall {
 /// While the action call is basically the name of the action and the list of parameters. The same
 /// name and set of parameters can be used multiple times. In the relational world, this requires
 /// an additional object id of the action call relation/object.
-impl Crud<SqliteConnectionManager> for ActionCall {
+impl Crud<SqliteConnectionManager, i64> for ActionCall {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        self.id.as_ref()
+    }
+
     fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
         let sql = "CREATE TABLE IF NOT EXISTS ActionCall (
@@ -66,22 +73,22 @@ impl Crud<SqliteConnectionManager> for ActionCall {
 
     /// Inserts the action call and all parameters into the database and link them together with
     /// the ACParameterList table.
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         // Save the receiver
         let sql = "INSERT INTO ActionCall ( name ) VALUES ( ? )";
         let mut statement = connection.prepare(sql)?;
-        let action_call_id = statement.insert(params!(self.name))?;
+        let rowid = statement.insert(params!(self.name))?;
+        self.id = Some(rowid);
 
         // Save the parameters of the receiver
         let sql = "INSERT INTO ACParameterList ( action_call_id, parameter_id ) VALUES ( ?, ? )";
         let mut statement = connection.prepare(sql)?;
         for param in &mut self.parameters {
-            if let KeyValue::Integer(p_id) = param.insert(connection)? {
-                statement.insert(params![action_call_id, p_id])?;
-            }
+            let p_id = param.insert(connection)?;
+            statement.insert(params![rowid, p_id])?;
         }
-        Ok(KeyValue::Integer(action_call_id))
+        Ok(&self.id.as_ref().unwrap())
     }
 
     fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
@@ -92,7 +99,7 @@ impl Crud<SqliteConnectionManager> for ActionCall {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
@@ -103,6 +110,7 @@ impl Crud<SqliteConnectionManager> for ActionCall {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Parameter {
+    id: Option<i64>,
     name: VariableId,
     value: VariableValue,
 }
@@ -113,15 +121,20 @@ impl TryFrom<&ValidatedValue> for Parameter {
         if let ValidatedValue::Object(attributes) = value {
             let name: String = get_mandatory(attributes, "name")?.try_into()?;
             let value: VariableValue = get_mandatory(attributes, "value")?.try_into()?;
-            Ok(Self { name, value })
+            Ok(Self { id: None, name, value })
         } else {
             Err(StateChartError::UnexpectedType)
         }
     }
 }
 
-impl Crud<SqliteConnectionManager> for Parameter {
+impl Crud<SqliteConnectionManager, i64> for Parameter {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        self.id.as_ref()
+    }
 
     /// Crates the tables, needed to store a parameter of a action call or a predicate.
     /// To simulate the enumeration behaviour the value type must be stored with it.
@@ -143,14 +156,15 @@ impl Crud<SqliteConnectionManager> for Parameter {
     /// Inserts the value of the variable in a different column, depending on the value type.
     /// If the value type is none, a string value is assumed. This is realized by the get_column_name()
     /// and get_type() methods of the VariableValue.
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         let value_column = self.value.get_column_name();
         let sql = format!("INSERT INTO Parameter (name, value_type, {value_column}) VALUES (?, ?, ?)");
         let mut statement = connection.prepare(&sql)?;
         let rowid = statement.insert(params![self.name, self.value.get_type(), self.value.to_string() ])?;
+        self.id = Some(rowid);
                                                              // parameters here!
-        Ok(KeyValue::Integer(rowid))
+        Ok(self.id.as_ref().unwrap())
     }
     fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
@@ -162,24 +176,24 @@ impl Crud<SqliteConnectionManager> for Parameter {
     }
 
     /// Selects a parameter with type and value from the database.
-    fn select(connection: &PooledConnection<SqliteConnectionManager>, key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(connection: &PooledConnection<SqliteConnectionManager>, key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
-        let sql = "SELECT name, value_type, string_value, integer_value, number_value, boolean_value
+        let sql = "SELECT rowid, name, value_type, string_value, integer_value, number_value, boolean_value
                    FROM Parameter WHERE rowid=?";
         let mut statement = connection.prepare(sql)?;
         let mut rows = statement.query([key_value])?;
         if let Some(row) = rows.next()? {
-            let value_type: String = row.get(1)?;
+            let value_type: String = row.get(2)?;
             let value = match value_type.as_str() {
-                "string" => VariableValue::String(row.get(2)?),
-                "integer" => VariableValue::Integer(row.get(3)?),
-                "number" => VariableValue::Number(row.get(4)?),
-                "boolean" => VariableValue::Boolean(row.get(5)?),
+                "string" => VariableValue::String(row.get(3)?),
+                "integer" => VariableValue::Integer(row.get(4)?),
+                "number" => VariableValue::Number(row.get(5)?),
+                "boolean" => VariableValue::Boolean(row.get(6)?),
                 _ => panic!("[Parameter::select()] Unexpected value type!"),
             };
-            Ok(Some(Parameter { name: row.get(0)?, value }))
+            Ok(Some(Parameter { id: Some(row.get(0)?), name: row.get(1)?, value }))
         } else {
             Ok(None)
         }
@@ -190,6 +204,7 @@ impl Crud<SqliteConnectionManager> for Parameter {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Transition {
+    id: Option<i64>,
     /// The check, which tests, if the transaction is activated.
     guard: Guard,
     /// The node, we reach after the transaction is activated.
@@ -211,15 +226,20 @@ impl TryFrom<&ValidatedValue> for Transition {
                     Some(ac)
                 }
             };
-            Ok(Transition { guard, to, action })
+            Ok(Transition { id: None, guard, to, action })
         } else {
             Err(StateChartError::UnexpectedType)
         }
     }
 }
 
-impl Crud<SqliteConnectionManager> for Transition {
+impl Crud<SqliteConnectionManager, i64> for Transition {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        self.id.as_ref()
+    }
 
     /// Crates the tables, needed to store a parameter of a action call or a predicate.
     /// To simulate the enumeration behaviour the value type must be stored with it.
@@ -238,7 +258,7 @@ impl Crud<SqliteConnectionManager> for Transition {
 
         Ok(())
     }
-    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         todo!()
     }
@@ -250,7 +270,7 @@ impl Crud<SqliteConnectionManager> for Transition {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
@@ -283,8 +303,15 @@ impl TryFrom<&ValidatedValue> for Guard {
     }
 }
 
-impl Crud<SqliteConnectionManager> for Guard {
+impl Crud<SqliteConnectionManager, i64> for Guard {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        // FIXME: This needs to be managed! If the guard is an entity, it must be a struct!
+        // Otherwise it should go to the Transition entity.
+        None
+    }
 
     /// Crates the tables, needed to store a parameter of a action call or a predicate.
     /// To simulate the enumeration behaviour the value type must be stored with it.
@@ -302,7 +329,7 @@ impl Crud<SqliteConnectionManager> for Guard {
 
         Ok(())
     }
-    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         todo!()
     }
@@ -314,7 +341,7 @@ impl Crud<SqliteConnectionManager> for Guard {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
@@ -328,6 +355,7 @@ impl Crud<SqliteConnectionManager> for Guard {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct PredicateCall {
+    id: Option<i64>,
     name: PredicateId,
     parameters: Vec<Parameter>,
 }
@@ -339,15 +367,20 @@ impl TryFrom<&ValidatedValue> for PredicateCall {
             let name: PredicateId = get_mandatory(attributes, "name")?.try_into()?;
             let parameters =
                 parameters_from_validated_values(get_mandatory(attributes, "parameters")?)?;
-            Ok(PredicateCall { name, parameters })
+            Ok(PredicateCall { id: None, name, parameters })
         } else {
             Err(StateChartError::UnexpectedType)
         }
     }
 }
 
-impl Crud<SqliteConnectionManager> for PredicateCall {
+impl Crud<SqliteConnectionManager, i64> for PredicateCall {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        self.id.as_ref()
+    }
 
     fn create(connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
@@ -365,11 +398,12 @@ impl Crud<SqliteConnectionManager> for PredicateCall {
 
         Ok(())
     }
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         let sql = "INSERT INTO PredicateCall ( name ) VALUES ( ? )";
         let mut statement = connection.prepare(sql)?;
         let predicate_call_id = statement.insert(params![self.name])?;
+        self.id = Some(predicate_call_id);
 
         let sql = "INSERT INTO PCParameterList ( predicate_call_id, parameter_id ) VALUES ( ?, ? )";
         let mut statement = connection.prepare(sql)?;
@@ -377,7 +411,7 @@ impl Crud<SqliteConnectionManager> for PredicateCall {
             let parameter_id = param.insert(&connection)?;
             statement.insert(params![predicate_call_id, parameter_id])?;
         }
-        Ok(KeyValue::Integer(predicate_call_id))
+        Ok(&self.id.as_ref().unwrap())
     }
     fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
@@ -387,7 +421,7 @@ impl Crud<SqliteConnectionManager> for PredicateCall {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
@@ -399,6 +433,7 @@ impl Crud<SqliteConnectionManager> for PredicateCall {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct VariableDeclaration {
+    id: Option<i64>,
     name: String,
     r#type: String,
     value: VariableValue,
@@ -418,6 +453,7 @@ impl TryFrom<&ValidatedValue> for VariableDeclaration {
     fn try_from(value: &ValidatedValue) -> Result<Self, Self::Error> {
         if let ValidatedValue::Object(attributes) = value {
             Ok(VariableDeclaration {
+                id: None,
                 name: get_mandatory(attributes, "name")?.try_into()?,
                 r#type: get_mandatory(attributes, "type")?.try_into()?,
                 value: get_mandatory(attributes, "value")?.try_into()?,
@@ -428,8 +464,13 @@ impl TryFrom<&ValidatedValue> for VariableDeclaration {
     }
 }
 
-impl Crud<SqliteConnectionManager> for VariableDeclaration {
+impl Crud<SqliteConnectionManager, i64> for VariableDeclaration {
     type Error = rusqlite::Error;
+
+    fn get_id(&self) -> Option<&i64>
+    {
+        self.id.as_ref()
+    }
 
     /// Crates the tables, needed to store a parameter of a action call or a predicate.
     /// To simulate the enumeration behaviour the value type must be stored with it.
@@ -448,13 +489,14 @@ impl Crud<SqliteConnectionManager> for VariableDeclaration {
 
         Ok(())
     }
-    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<KeyValue, Self::Error>
+    fn insert(&mut self, connection: &PooledConnection<SqliteConnectionManager>) -> Result<&i64, Self::Error>
     {
         let value_column = self.value.get_column_name();
         let sql = format!("INSERT INTO VariableDeclaration ( name, variable_type, {value_column} ) VALUES ( ?, ?, ? )");
         let mut statement = connection.prepare(&sql)?;
         let rowid = statement.insert(params![self.name, self.value.get_type(), self.value.to_string() ])?;
-        Ok(KeyValue::Integer(rowid))
+        self.id = Some(rowid);
+        Ok(self.id.as_ref().unwrap())
     }
     fn update(&self, _connection: &PooledConnection<SqliteConnectionManager>) -> Result<(), Self::Error>
     {
@@ -464,7 +506,7 @@ impl Crud<SqliteConnectionManager> for VariableDeclaration {
     {
         todo!()
     }
-    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: KeyValue) -> Result<Option<Self>, Self::Error>
+    fn select(_connection: &PooledConnection<SqliteConnectionManager>, _key_value: &i64) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized
     {
@@ -637,19 +679,19 @@ mod tests {
     fn test_parametert_crud() {
         let connection = create_db_connection();
         Parameter::create(&connection).unwrap();
-        let mut p1 = Parameter { name: "p1".into(), value: VariableValue::String("a string".into()) };
+        let mut p1 = Parameter { id: None, name: "p1".into(), value: VariableValue::String("a string".into()) };
         let oid_p1 = p1.insert(&connection).unwrap();
-        let mut p2 = Parameter { name: "p2".into(), value: VariableValue::Integer(3623456) };
+        let mut p2 = Parameter { id: None, name: "p2".into(), value: VariableValue::Integer(3623456) };
         p2.insert(&connection).unwrap();
-        let mut p3 = Parameter { name: "p3".into(), value: VariableValue::Number(3623456.123456) };
+        let mut p3 = Parameter { id: None, name: "p3".into(), value: VariableValue::Number(3623456.123456) };
         p3.insert(&connection).unwrap();
-        let mut p4 = Parameter { name: "p4".into(), value: VariableValue::Boolean(true) };
+        let mut p4 = Parameter { id: None, name: "p4".into(), value: VariableValue::Boolean(true) };
         p4.insert(&connection).unwrap();
-        let mut p5 = Parameter { name: "p5".into(), value: VariableValue::None };
+        let mut p5 = Parameter { id: None, name: "p5".into(), value: VariableValue::None };
         p5.insert(&connection).unwrap();
 
         // Checking on retrieval.
-        let r_p1 = Parameter::select(&connection, oid_p1).unwrap().unwrap();
+        let r_p1 = Parameter::select(&connection, &oid_p1).unwrap().unwrap();
         assert_eq!(r_p1.name, p1.name);
         assert_eq!(r_p1.value, p1.value);
     }
@@ -659,10 +701,10 @@ mod tests {
         let connection = create_db_connection();
         PredicateCall::create(&connection).unwrap();
         Parameter::create(&connection).unwrap();
-        let mut pred1 = PredicateCall { name: "False".into(), parameters: Vec::new() };
+        let mut pred1 = PredicateCall { id: None, name: "False".into(), parameters: Vec::new() };
         pred1.insert(&connection).unwrap();
-        let a = Parameter { name: "a".into(), value: VariableValue::Boolean(false) };
-        let mut is_true = PredicateCall { name: "is_true".into(), parameters: vec![a] };
+        let a = Parameter { id: None, name: "a".into(), value: VariableValue::Boolean(false) };
+        let mut is_true = PredicateCall { id: None, name: "is_true".into(), parameters: vec![a] };
         is_true.insert(&connection).unwrap();
 
         // FIXME: Check, if we can retrieve also.
@@ -673,10 +715,10 @@ mod tests {
         let connection = create_db_connection();
         ActionCall::create(&connection).unwrap();
         Parameter::create(&connection).unwrap();
-        let mut ac1 = ActionCall { name: "send".into(), parameters: Vec::new() };
+        let mut ac1 = ActionCall { id: None, name: "send".into(), parameters: Vec::new() };
         ac1.insert(&connection).unwrap();
-        let msg = Parameter { name: "msg".into(), value: VariableValue::String("A message to you Rudi!".into()) };
-        let mut ac2 = ActionCall { name: "send".into(), parameters: vec![msg] };
+        let msg = Parameter { id: None, name: "msg".into(), value: VariableValue::String("A message to you Rudi!".into()) };
+        let mut ac2 = ActionCall { id: None, name: "send".into(), parameters: vec![msg] };
         ac2.insert(&connection).unwrap();
 
         // FIXME: Check, if we can retrieve also.
@@ -686,7 +728,7 @@ mod tests {
     fn test_variable_declaration_crud() {
         let connection = create_db_connection();
         VariableDeclaration::create(&connection).unwrap();
-        let mut vd1 = VariableDeclaration { name: "vd1".into(), r#type: "string".into(), value: VariableValue::String("Hello".into()) };
+        let mut vd1 = VariableDeclaration { id: None, name: "vd1".into(), r#type: "string".into(), value: VariableValue::String("Hello".into()) };
         vd1.insert(&connection).unwrap();
 
         // FIXME: Check, if we can retrieve also.

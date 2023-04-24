@@ -1,4 +1,6 @@
 use crate::error::StateChartError;
+use rusqlite::ToSql;
+use rusqlite::types::ToSqlOutput;
 use open_api_matcher::{ValidatedValue, Value};
 use regex::Regex;
 use uuid::Uuid;
@@ -31,6 +33,14 @@ impl NodeId {
         } else {
             Err(StateChartError::InvalidNodeId(self.clone()))
         }
+    }
+}
+
+impl ToSql for NodeId {
+    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error>
+    {
+        let NodeId(id) = &self;
+        id.to_sql()
     }
 }
 
